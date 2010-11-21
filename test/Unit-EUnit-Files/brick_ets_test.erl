@@ -1,11 +1,11 @@
 %%% Copyright: (c) 2009 Gemini Mobile Technologies, Inc.  All rights reserved.
-%%% 
+%%%
 %%% Licensed under the Apache License, Version 2.0 (the "License");
 %%% you may not use this file except in compliance with the License.
 %%% You may obtain a copy of the License at
-%%% 
+%%%
 %%%     http://www.apache.org/licenses/LICENSE-2.0
-%%% 
+%%%
 %%% Unless required by applicable law or agreed to in writing, software
 %%% distributed under the License is distributed on an "AS IS" BASIS,
 %%% WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
@@ -38,13 +38,25 @@ all_tests_test_() ->
      fun test_setup/0,
      fun test_teardown/1,
      [
-      ?_test(test_scavenger_get_keys()),
-      ?_test(test_data_integrity())
+      %%DISABLE ?_test(test_scavenger_get_keys()),
+      %%DISABLE ?_test(test_data_integrity())
      ]}.
 
+-define(APPS, [gdss_admin, gdss_client, gdss, gmt, inets, crypto, sasl]).
+
 test_setup() ->
+    %% @TODO - boilerplate start
+    os:cmd("rm -rf Schema.local hlog.* root"),
+    os:cmd("ln -s ../../gdss-admin/priv/root ."),
+    os:cmd("epmd -kill; sleep 1"),
+    os:cmd("epmd -daemon; sleep 1"),
+    {ok, _} = net_kernel:start(['eunit@localhost', shortnames]),
+    ok = application:set_env(gmt, central_config, "../priv/central.conf"),
+    [ application:stop(A) || A <- ?APPS ],
+    [ ok=application:start(A) || A <- lists:reverse(?APPS) ],
     random:seed(erlang:now()),
     gmt_config_svr:set_config_value(brick_max_log_size_mb,"1"),
+    %% @TODO - boilerplate stop
     brick_admin:bootstrap_local([], true, $/, 3, 1, 1, []),
     Nodes = [node()],
     GDSSAdmin = node(),
@@ -54,6 +66,17 @@ test_setup() ->
     [ T= ets:new(T,[ordered_set,named_table,public]) || {T,[],true} <- all_tables() ],
     offset_table = ets:new(offset_table,[ordered_set,named_table,public]),
     load_tables(?KILLTIME),
+
+    ok.
+
+test_teardown(_) ->
+    %% @TODO - boilerplate start
+    [ application:stop(A) || A <- ?APPS ],
+    ok = application:unset_env(gmt, central_config),
+    ok = net_kernel:stop(),
+    %% @TODO - boilerplate stop
+    [ ets:delete(T) || {T,[],true} <- all_tables() ],
+    ets:delete(offset_table),
     ok.
 
 test_data_integrity() ->
@@ -80,7 +103,7 @@ test_read_hlog() ->
     Sizes = lists:map(fun filelib:file_size/1,Hlogs),
     LgsAndSz = lists:zip(Hlogs,Sizes),
     {LogFile,_Max} = lists:foldl(fun({File,Size},{F,S}) ->
-                                         if Size > S -> 
+                                         if Size > S ->
                                                  {File,Size};
                                             true ->
                                                  {F,S}
@@ -130,10 +153,6 @@ read_offset_size(FH,Off,Sz) ->
     {ok,Bin} = file:pread(FH,Off,Sz),
     binary_to_term(Bin).
 
-test_teardown(_) ->
-    application:stop(gdss),
-    ok.
-
 make_data_set() ->
      lists:map(fun(I) ->
                        { list_to_binary(lists:flatten(io_lib:format("/~w",[I]))),
@@ -179,7 +198,7 @@ test_scavenger_get_keys() ->
 restart_gdss(N) ->
     timer:sleep(N),
     application:stop(gdss).
- 
+
 
 all_tables() ->
     [

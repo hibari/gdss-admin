@@ -1467,15 +1467,6 @@ columnify_1_line(Key, HE) ->
 string_ify(Term) ->
     lists:flatten(io_lib:print(Term, 1, 9999, -1)).
 
-%% HE#hevent.detail,
-%%      io_lib:print(HE#hevent.props, 1, 9999, -1)])).
-%%     lists:flatten(
-%%       io_lib:format("~s | ~s | ~s | ~w | ~s\n",
-%%                  [dump_fmt_date(HE#hevent.time), dump_fmt_width(Key, 45),
-%%                   dump_fmt_width(HE#hevent.what, 12),
-%%                   HE#hevent.detail,
-%%                   io_lib:print(HE#hevent.props, 1, 9999, -1)])).
-
 dump_fmt_date({_, _, MSec} = Now) ->
     {{YYYY,MM,DD},{Hour,Min,Sec}} = calendar:now_to_local_time(Now),
     Date =
@@ -1483,9 +1474,6 @@ dump_fmt_date({_, _, MSec} = Now) ->
                       [DD, httpd_util:month(MM), YYYY, Hour, Min, Sec,
                        MSec div 1000]),
     lists:flatten(Date).
-
-dump_fmt_width(Term, Width) ->
-    gmt_util:right_pad(lists:flatten(io_lib:format("~p", [Term])), Width, 32).
 
 dump_filter_props(HE) ->
     HE#hevent{props = lists:foldl(
@@ -1502,46 +1490,3 @@ dump_filter_props(HE) ->
                         end, [], if is_list(HE#hevent.props) -> HE#hevent.props;
                                     true -> [HE#hevent.props]
                                  end)}.
-
-watch_mailbox_size(Secs) ->
-    proc_lib:spawn(fun() ->
-                  brick_itimer:send_interval(1000, click),
-                  watch_mailbox_size_loop(Secs)
-          end).
-
-watch_mailbox_size_loop(0) ->
-    io:format("watch_mailbox_size_loop pid ~p exiting\n", [self()]),
-    exit(normal);
-watch_mailbox_size_loop(N) ->
-    receive click -> ok end,
-    Pids0 = [Pid || Pid <- processes(),
-                    try element(2, process_info(Pid, message_queue_len))
-                    catch _:_ ->
-                            0
-                    end > 500],
-    Pids = lists:filter(
-             fun(Pid) ->
-                     case process_info(Pid, registered_name) of
-                         {registered_name, brick_shepherd} -> false;
-                         _                                 -> true
-                     end
-             end, Pids0),
-    if Pids == [] ->
-            ok;
-       true ->
-            try
-                TimeT = gmt_time:time_t(),
-                Path = "/tmp/mbox-size." ++ integer_to_list(TimeT),
-                {ok, FH} = file:open(Path, [write]),
-                [io:format(FH, "Pid ~p\n\nProcess info:\n~p\n\nBacktrace:\n~s\n\n",
-                           [Pid, process_info(Pid), element(2, process_info(Pid, backtrace))])
-                 || Pid <- Pids],
-                file:close(FH),
-                io:format("Watcher: ~s ~p\n", [Path, Pids])
-            catch X:Y ->
-                    io:format("Watch ERROR: ~p:~p\n", [X, Y])
-            end
-    end,
-    watch_mailbox_size_loop(N-1).
-
-

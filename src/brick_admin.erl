@@ -234,7 +234,6 @@ start(BootstrapFile)
 
     case file:read_file(BootstrapFile) of
         {ok, _} ->
-
             %% Start the scoreboard.
             ChildSpec1 =
                 {brick_sb, {brick_sb, start_link, []},
@@ -305,14 +304,22 @@ get_client_monitor_list() ->
 %%
 %% start/stop API for OTP application behavior.
 %%
-
 start(normal, Args) ->
-    ?APPLOG_INFO(?APPLOG_APPM_002,"~s: normal start, Args = ~p\n", [?MODULE, Args]),
-    HackPid = spawn_link(fun() ->
-                                 brick_admin:start("Schema.local"),
-                                 receive goo -> ok end
-                         end),
-    {ok, HackPid};
+    ?APPLOG_INFO(?APPLOG_APPM_002,"~s: normal start, Args = ~p\n",
+                 [?MODULE, Args]),
+
+    gmt_cinfo_basic:register(),
+    brick_cinfo:register(),
+    brick_admin_cinfo:register(),
+
+    case brick_admin_sup:start_link() of
+        {ok, _Pid}=Ok ->
+            brick_admin:start("Schema.local"),
+            Ok;
+        Error ->
+            io:format("DEBUG: ~s:start bummer: ~w\n", [?MODULE, Error]),
+            Error
+    end;
 start(StartMethod, Args) ->
     ?APPLOG_INFO(?APPLOG_APPM_003,"~s: ~p start, Args = ~p\n",
                  [?MODULE, StartMethod, Args]),

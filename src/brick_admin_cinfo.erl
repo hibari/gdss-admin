@@ -13,11 +13,11 @@
 %%% See the License for the specific language governing permissions and
 %%% limitations under the License.
 %%%
-%%% File     : gmt_cinfo_basic.erl
+%%% File     : brick_admin_cinfo.erl
 %%% Purpose  : Cluster info/postmortem callback: GDSS config, stats, etc.
 %%%----------------------------------------------------------------------
 
--module(brick_cinfo).
+-module(brick_admin_cinfo).
 -include("applog.hrl").
 
 
@@ -37,18 +37,12 @@ cluster_info_init() ->
 
 cluster_info_generator_funs() ->
     [
-     {"GDSS: package version", fun package_version/1},
-     {"GDSS: application status", fun application_status/1},
      {"GDSS: Admin Server status", fun admin_server_status/1},
      {"GDSS: Bootstrap brick config", fun bootstrap_config/1},
      {"GDSS: Admin Server schema", fun admin_server_schema/1},
-     {"GDSS: Partition detector", fun partition_detector/1},
      {"GDSS: Admin Status top", fun admin_status_top/1},
      {"GDSS: Admin Status client monitors", fun admin_status_client_mons/1},
-     {"GDSS: Local brick status", fun local_brick_status/1},
-     {"GDSS: History dump", fun history_dump/1},
-     {"GDSS: contents of .../var/data directory", fun var_data_dir/1},
-     {"GDSS: NTP peers", fun ntp_peers/1}
+     {"GDSS: History dump", fun history_dump/1}
     ].
 
 admin_server_schema(C) ->
@@ -74,10 +68,6 @@ admin_status_top(C) ->
 admin_status_client_mons(C) ->
     admin_http_to_text(C, "/change_client_monitor.html").
 
-application_status(C) ->
-    RunP = lists:keymember(gdss, 1, application:which_applications()),
-    cluster_info:format(C, " GDSS application running: ~p\n", [RunP]).
-
 bootstrap_config(C) ->
     {ok, Bin} = file:read_file("Schema.local"),
     cluster_info:send(C, Bin).
@@ -95,32 +85,6 @@ history_dump(C) ->
               file:delete(Tmp)
           end,
     cluster_info:send(C, Res).
-
-local_brick_status(C) ->
-    Bricks = brick_shepherd:list_bricks(),
-    [cluster_info:format(C, " Brick ~p status:\n ~p\n\n",
-                         [Brick, brick_server:status(Brick, node())]) ||
-        Brick <- lists:sort(Bricks)].
-
-ntp_peers(C) ->
-    cluster_info:send(C, os:cmd("ntpq -p")).
-
-package_version(C) ->
-    cluster_info:send(C, os:cmd("sh -c \"egrep 'echo.*HOME' "
-                                "/etc/init.d/tcl /etc/init.d/ert "
-                                "/etc/init.d/gdss\"")).
-
-partition_detector(C) ->
-    Mod = partition_detector_server,
-    cluster_info:format(C, " Active: ~p\n", [catch Mod:is_active()]),
-    cluster_info:format(C, " Beacons: ~p\n",
-                        [catch lists:sort(Mod:get_last_beacons())]),
-    cluster_info:format(C, " State: ~p\n", [catch Mod:get_state()]).
-
-var_data_dir(C) ->
-    {ok, Cwd} = file:get_cwd(),
-    cluster_info:send(C, [" cwd: ", Cwd, "\n",
-                          " ls -l: \n", os:cmd("ls -l")]).
 
 %%%%%%%%%%
 
