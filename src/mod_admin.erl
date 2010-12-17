@@ -46,9 +46,13 @@
 
 -ifdef(new_inets).
 -include_lib("inets/src/http_server/httpd.hrl").
+-ifndef(NICE).
+-define(NICE(Reason),lists:flatten(atom_to_list(?MODULE)++": "++Reason)).
+-endif.
 -else.
 -include_lib("inets/src/httpd.hrl").
 -endif.
+
 -include("brick_hash.hrl").
 -include("brick_admin.hrl").
 
