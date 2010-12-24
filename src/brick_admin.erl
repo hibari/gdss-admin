@@ -67,8 +67,8 @@
 %%
 
 -module(brick_admin).
--include("applog.hrl").
 
+-include("gmt_elog.hrl").
 
 -behaviour(gen_server).
 
@@ -79,10 +79,6 @@
 -include("gmt_hlog.hrl").
 -include("partition_detector.hrl").
 
--ifdef(debug_admin).
--define(gmt_debug, true).
--endif.
--include("gmt_debug.hrl").
 -include("brick_specs.hrl").
 
 -define(S3_TABLE, 'tab1').
@@ -270,7 +266,7 @@ start_er_up(BootstrapFile) ->
                           [{timeout, 20*1000}]).
 
 stop() ->
-    ?APPLOG_INFO(?APPLOG_APPM_001,"Admin server shutdown requested\n", []),
+    ?ELOG_INFO("Admin server shutdown requested"),
     %% TODO: This needs to be much nicer: stop all workers and sub-supervisors
     %% nicely, because this simple mechanism was originally written in a
     %% different supervisor hierarchy.
@@ -305,8 +301,7 @@ get_client_monitor_list() ->
 %% start/stop API for OTP application behavior.
 %%
 start(normal, Args) ->
-    ?APPLOG_INFO(?APPLOG_APPM_002,"~s: normal start, Args = ~p\n",
-                 [?MODULE, Args]),
+    ?ELOG_INFO("normal start, Args = ~p", [Args]),
 
     gmt_cinfo_basic:register(),
     brick_cinfo:register(),
@@ -321,12 +316,11 @@ start(normal, Args) ->
             Error
     end;
 start(StartMethod, Args) ->
-    ?APPLOG_INFO(?APPLOG_APPM_003,"~s: ~p start, Args = ~p\n",
-                 [?MODULE, StartMethod, Args]),
+    ?ELOG_INFO("~p start, Args = ~p", [StartMethod, Args]),
     start(normal, Args).
 
 stop(Args) ->
-    ?APPLOG_INFO(?APPLOG_APPM_004,"~s: stop, Args = ~p\n", [?MODULE, Args]),
+    ?ELOG_INFO("stop, Args = ~p", [Args]),
     ok.
 
 create_new_schema(InitialBrickList, File) ->
@@ -622,7 +616,7 @@ hack_all_tab_setup(TableName, ChainLength, Nodes, BrickOptions, DoCreateAdd,
                 Err  -> throw(Err)
             end;
        true ->
-            ?APPLOG_ALERT(?APPLOG_APPM_005,"hack_all_tab_setup: DoCreateAdd is false.  My caller better be a debug/test function only, because this function should not be used by anything the admin server does!\n",[]),
+            ?ELOG_ERROR("hack_all_tab_setup: DoCreateAdd is false.  My caller better be a debug/test function only, because this function should not be used by anything the admin server does!"),
             timer:sleep(2*1000),
             ok
     end,
@@ -694,8 +688,7 @@ init([BootstrapFile]) ->
 %% Description: Handling call messages
 %%--------------------------------------------------------------------
 handle_call({chain_status_change, ChainName, unknown, _PropList}, _From, State) ->
-    ?APPLOG_INFO(?APPLOG_APPM_011,"~s: handle_cast: chain ~p in unknown state\n",
-                 [?MODULE, ChainName]),
+    ?ELOG_INFO("chain ~p in unknown state", [ChainName]),
     {reply, ok, State};
 handle_call({chain_status_change, ChainName, Status, PropList}, _From, State) ->
     case process_info(self(), message_queue_len) of
@@ -765,7 +758,7 @@ handle_call({add_bootstrap_copy, [{B,N}|_T]=BrickList}, _From, State) when is_at
     {Reply, NewState} = do_add_bootstrap_copy(BrickList, State),
     {reply, Reply, NewState};
 handle_call(_Request, _From, State) ->
-    ?APPLOG_ALERT(?APPLOG_APPM_010,"~s: handle_call: ~p\n", [?MODULE, _Request]),
+    ?ELOG_ERROR("handle_call: ~p", [_Request]),
     Reply = err_bad_call,
     {reply, Reply, State}.
 
@@ -776,7 +769,7 @@ handle_call(_Request, _From, State) ->
 %% Description: Handling cast messages
 %%--------------------------------------------------------------------
 handle_cast(_Msg, State) ->
-    ?APPLOG_ALERT(?APPLOG_APPM_012,"~s: handle_cast: ~P\n", [?MODULE, _Msg, 20]),
+    ?ELOG_ERROR("handle_cast: ~P", [_Msg, 20]),
     {noreply, State}.
 
 %%--------------------------------------------------------------------
@@ -796,8 +789,7 @@ handle_info({finish_init_tasks, BootstrapFile}, State) ->
     [spawn(fun() -> net_adm:ping(Nd) end)|| {_, Nd} <- DiskBrickList],
     timer:sleep(1000),
 
-    {ok, MboxHigh} = gmt_config_svr:get_config_value_i(
-                       brick_admin_mbox_high_water, 100),
+    {ok, MboxHigh} = application:get_env(gdss_admin, brick_admin_mbox_high_water),
     %% Cross-app dependency: we need the partition_detector app running.
     %% If not, complain loudly.
     StartTime = now(),
@@ -818,23 +810,22 @@ handle_info({finish_init_tasks, BootstrapFile}, State) ->
                                                            ExtraRunning),
             gen_event:add_sup_handler(?EVENT_SERVER, brick_admin_event_h, []),
             0 = check_for_other_admin_server_beacons(3, StartTime),
-            ?APPLOG_INFO(?APPLOG_APPM_006,"Finished checking for Admin Server "
-                         "beacons\n", []);
+            ?ELOG_INFO("Finished checking for Admin Server beacons");
         _ ->
             gmt_util:set_alarm({app_disabled, partition_detector},
                                "This application must run in production environments.",
                                fun() -> ok end),
-            ?APPLOG_WARNING(?APPLOG_APPM_007,"ERROR: partition_detector application "
-                            "is not running!  This should not happen "
-                            "in a production environment.",[])
+            ?ELOG_WARNING("ERROR: partition_detector application "
+                          "is not running!  This should not happen "
+                          "in a production environment.")
     end,
 
     case global:whereis_name(?MODULE) of
         undefined ->
             ok;
         APid ->
-            ?APPLOG_ALERT(?APPLOG_APPM_008,"~s: admin server already running on ~p\n",
-                          [?MODULE, node(APid)]),
+            ?ELOG_ERROR("admin server already running on ~p",
+                        [node(APid)]),
             exit({global_name_already_in_use, ?MODULE})
     end,
     yes = global:register_name(?MODULE, self()), % Honest racing here.
@@ -896,8 +887,7 @@ handle_info({finish_init_tasks, BootstrapFile}, State) ->
     %% Start client monitor processes (must be done async/after our init())
     spawn(fun() -> timer:sleep(200), run_client_monitor_procs() end),
 
-    ?APPLOG_INFO(?APPLOG_APPM_009,"~s: admin server now running on ~p\n",
-                 [?MODULE, node()]),
+    ?ELOG_INFO("admin server now running on ~p", [node()]),
     {noreply, State#state{schema = Schema, mig_mons = MMs,
                           start_time = StartTime, extra_term = ExtraRunning,
                           mbox_highwater = MboxHigh}};
@@ -915,7 +905,7 @@ handle_info({table_finished_migration, TableName} = Msg, State) ->
                       end, x),
     {noreply, do_table_almost_finished_migration(TableName, State)};
 handle_info({clear_migmon_pid, TableName}, #state{mig_mons = MMs} = State) ->
-    ?E_INFO("Clearing final migration state for table ~p\n", [TableName]),
+    ?E_INFO("Clearing final migration state for table ~p", [TableName]),
     {noreply, State#state{mig_mons = lists:keydelete(TableName, 1, MMs)}};
 handle_info({Ref, _Reply}, State) when is_reference(Ref) ->
     %% Late gen_server reply, ignore it.
@@ -924,7 +914,7 @@ handle_info(restart_pingers_and_chmons, State) ->
     async_start_pingers_and_chmons(State#state.schema),
     {noreply, State};
 handle_info(_Info, State) ->
-    ?APPLOG_ALERT(?APPLOG_APPM_013,"~s: handle_info: ~P\n", [?MODULE, _Info, 20]),
+    ?ELOG_ERROR("handle_info: ~P", [_Info, 20]),
     {noreply, State}.
 
 %%--------------------------------------------------------------------
@@ -952,12 +942,9 @@ code_change(_OldVsn, State, _Extra) ->
 
 start_pingers_and_chmons(Schema) ->
     brick_bp:start_pingers(Schema#schema_r.schema_bricklist, []),
-    %% ?DBG(schema_to_proplists(Schema)),
     lists:map(
       fun({_TableName, Props}) ->
-              ?DBG(Props),
               BrickOptions = proplists:get_value(brick_options, Props, []),
-              ?DBG(BrickOptions),
               GH = proplists:get_value(ghash, Props),
               %% AllChains will contain duplicate chains and perhaps
               %% duplicate bricks within each chain, be prepared.
@@ -968,11 +955,9 @@ start_pingers_and_chmons(Schema) ->
                   (GH#g_hash_r.current_h_desc)#hash_r.healthy_chainlist ++
                   (GH#g_hash_r.new_h_desc)#hash_r.healthy_chainlist,
               AllBricks = [B || {_ChainName,Bricks} <- AllChains, B <- Bricks],
-              %%io:format("ZZZ: AllChains = ~p\n", [AllChains]),
-              %%io:format("ZZZ: AllBricks = ~p\n", [AllBricks]),%erlang:halt(),
-              ?DBG(AllChains),
+              %%io:format("ZZZ: AllChains = ~p", [AllChains]),
+              %%io:format("ZZZ: AllBricks = ~p", [AllBricks]),%erlang:halt(),
               [ok = brick_chainmon:start_mon(C) || C <- lists:usort(AllChains)],
-              ?DBG(AllBricks),
               ok = brick_bp:start_pingers(lists:usort(AllBricks), BrickOptions)
       end, schema_to_proplists(Schema)).
 
@@ -1022,31 +1007,25 @@ start_standalone_brick({Brick, Node}) ->
     %% TODO: Is there any reason (ease of diagnostics/cluster debugging?)
     %% why we'd want more error checking and/or logging and/or tracing
     %% in here?
-    %% ?DBG(start_standalone_brick0),
-    %%     net_adm:ping(Node),
-    ?DBG(start_standalone_brick2),
     case rpc:call(Node, brick_shepherd, start_brick, [Brick, []], 1*1000) of
         {badrpc, nodedown} ->
-                                                % if the service is down, can't really do anything below can it?
-                                                % anything else let it crash.  bz 25933
-            ?APPLOG_WARNING(?APPLOG_APPM_014,"~p is down ~n", [{Brick, Node}]);
-
+            %% if the service is down, can't really do anything below can it?
+            %% anything else let it crash.  bz 25933
+            ?ELOG_WARNING("~p is down ~n", [{Brick, Node}]);
         _ ->
             %% Don't wait too long here, or else we can block the
             %% starting of some other node.  The other option is to do
             %% this in parallel, bu that's the caller's decision to do
             %% or not do.
             PollRes = poll_brick_status(Brick, Node, 8),
-            ?E_INFO("~s: brick ~p ~p started: ~P\n",
-                    [?MODULE, Brick, Node, PollRes, 7]),
-            ?DBG({start_standalone_brick, Brick, Node, _R3}),
+            ?E_INFO("brick ~p ~p started: ~P",
+                    [Brick, Node, PollRes, 7]),
             RoleRes = brick_server:chain_role_standalone(Brick, Node),
-            ?E_INFO("~s: brick ~p ~p role set: ~p\n",
-                    [?MODULE, Brick, Node, RoleRes]),
-            ?DBG(start_standalone_brick4),
+            ?E_INFO("brick ~p ~p role set: ~p",
+                    [Brick, Node, RoleRes]),
             RepairRes = brick_server:chain_set_my_repair_state(Brick, Node, ok),
-            ?E_INFO("~s: brick ~p ~p state set: ~p\n",
-                    [?MODULE, Brick, Node, RepairRes])
+            ?E_INFO("brick ~p ~p state set: ~p",
+                    [Brick, Node, RepairRes])
     end,
     ok.
 
@@ -1136,7 +1115,7 @@ separate_good_from_bad(Res) ->
 %% @spec (list(brick_t()), bool(), path()) -> {list(brick_t()), list(brick_t())}
 
 do_copy_new_schema(InitialBrickList, PropList, File) ->
-    {ok, FileDir} = gmt_config_svr:get_config_value(application_data_dir, "/dev/null"),
+    {ok, FileDir} = application:get_env(gdss_admin, application_data_dir),
     File1 = filename:join([FileDir, File]),
     {_, _, {ok, FileData}} =
         {should_exist, File1, file:read_file(File1)},
@@ -1155,7 +1134,7 @@ do_copy_new_schema2(File, FileData, InitialBrickList, _PropList) ->
       || B <- InitialBrickList ].
 
 do_copy_new_schema3(File, FileData) ->
-    {ok, FileDir} = gmt_config_svr:get_config_value(application_data_dir, "/dev/null"),
+    {ok, FileDir} = application:get_env(gdss_admin, application_data_dir),
     File1 = filename:join([FileDir, File]),
     {_, _, {error, enoent}} =
         {should_not_exist, File1, file:read_file_info(File1)},
@@ -1210,7 +1189,6 @@ do_add_table(Name, ChainList, BrickOptions, S) ->
             end,
             lists:foreach(
               fun({_ChainName, Bricks} = _Ch) ->
-                      ?DBG(_Ch),
                       lists:foreach(
                         fun({Brick, Node}) ->
                                 %% 1. Node is running.
@@ -1406,7 +1384,8 @@ do_chain_status_change(ChainName, Status, PropList, S) ->
     case dict:find(ChainName, Schema#schema_r.chain2tab) of
         {ok, TableName} ->
             {ok, T} = dict:find(TableName, Schema#schema_r.tabdefs),
-            ?APPLOG_INFO(?APPLOG_APPM_015,"status_change: Chain ~p status ~p belongs to tab ~p\n", [ChainName, Status, TableName]),
+            ?ELOG_INFO("status_change: Chain ~p status ~p belongs to tab ~p",
+                       [ChainName, Status, TableName]),
             GH = T#table_r.ghash,
             NewGH = brick_hash:update_chain_dicts(GH, ChainName, ChainNow),
             NewSchema = update_tab_ghash(TableName, T, NewGH, Schema),
@@ -1473,7 +1452,7 @@ info_table_r() ->
 do_spam_gh_to_all_nodes(S, DesiredTableName) ->
     %% TODO: We're spamming all tables' GH.  In theory, we only need to
     %%       spam once, all others are single table GH updates.
-    ?APPLOG_INFO(?APPLOG_APPM_016,"do_spam_gh_to_all_nodes: top\n",[]),
+    ?ELOG_INFO("do_spam_gh_to_all_nodes: top"),
     AllTabDefs = dict:to_list((S#state.schema)#schema_r.tabdefs),
     TabDefs = if DesiredTableName == '$$all_tables$$' ->
                       AllTabDefs;
@@ -1483,9 +1462,8 @@ do_spam_gh_to_all_nodes(S, DesiredTableName) ->
               end,
     Fs = lists:foldl(fun({TableName, T}, Acc) ->
                              GH = T#table_r.ghash,
-                             ?APPLOG_INFO(?APPLOG_APPM_106,
-                                          "do_spam_gh_to_all_nodes: minor_rev=~p\n",
-                                          [GH#g_hash_r.minor_rev]),
+                             ?ELOG_INFO("do_spam_gh_to_all_nodes: minor_rev=~p",
+                                        [GH#g_hash_r.minor_rev]),
                              AllChains = lists:usort(
                                            brick_hash:all_chains(GH, current)
                                            ++ brick_hash:all_chains(GH, new)),
@@ -1565,8 +1543,8 @@ do_change_chain_length(ChainName, NewBrickList, S) ->
                            OldGH#g_hash_r.current_h_desc, ChainName, NewBrickList),
             NewNewDesc = brick_hash:desc_substitute_chain(
                            OldGH#g_hash_r.new_h_desc, ChainName, NewBrickList),
-            %%io:format("x NewCurDesc = ~p\n", [NewCurDesc]),
-            %%io:format("x NewNewDesc = ~p\n", [NewNewDesc]), timer:sleep(2000),
+            %%io:format("x NewCurDesc = ~p", [NewCurDesc]),
+            %%io:format("x NewNewDesc = ~p", [NewNewDesc]), timer:sleep(2000),
             NewGH_0 = brick_hash:init_global_hash_state(
                         OldGH#g_hash_r.migrating_p, OldGH#g_hash_r.phase,
                         OldGH#g_hash_r.current_rev,
@@ -1635,7 +1613,7 @@ do_change_chain_length(ChainName, NewBrickList, S) ->
                     %% already running, but that's OK.
                     _ = start_pingers_and_chmons(NewSchema),
                     timer:sleep(1*1000),        % TODO: figure out necessity
-                    ?APPLOG_INFO(?APPLOG_APPM_017,"OldOnlyBricks = ~p\n", [OldOnlyBricks]),
+                    ?ELOG_INFO("OldOnlyBricks = ~p", [OldOnlyBricks]),
                     [spawn(fun() ->
                                    %% Give monitors time to die & restart.
                                    timer:sleep(2*1000), % TODO: figure out necessity
@@ -1646,8 +1624,7 @@ do_change_chain_length(ChainName, NewBrickList, S) ->
                 end
             catch
                 X:Y ->
-                    ?APPLOG_ALERT(?APPLOG_APPM_018,
-                                  "do_change_chain_length: End: ~p ~p\n", [X, Y]),
+                    ?ELOG_ERROR("do_change_chain_length: End: ~p ~p", [X, Y]),
                     {{error, {X, Y}}, NewS}
             end
     end.
@@ -1704,9 +1681,8 @@ do_start_migration(TableName, NewLH, Options, S) ->
                       fun(ChName, GHx) ->
                               brick_hash:update_chain_dicts(GHx, ChName, [])
                       end, NewGH_2, NewOnlyChNames),
-            ?APPLOG_INFO(?APPLOG_APPM_019,
-                         "Migration number ~p is starting with cookie ~p\n",
-                         [NewGH#g_hash_r.current_rev, Cookie]),
+            ?ELOG_INFO("Migration number ~p is starting with cookie ~p",
+                       [NewGH#g_hash_r.current_rev, Cookie]),
             %% This call to update_tab_ghash() is not quite like the others
             %% because we need to update current_phase and chain2tab.
             T2 = T#table_r{current_phase = migrating, ghash = NewGH,
@@ -1765,8 +1741,8 @@ do_table_almost_finished_migration(TableName, S) ->
                   end, 0, AllActiveChains),
             io:format("done N = ~p, wanted = ~p\n", [N, length(AllActiveChains)]),
             if N == length(AllActiveChains) ->
-                    ?APPLOG_INFO(?APPLOG_APPM_020,"Migration number ~p almost finished\n",
-                                 [OldGH#g_hash_r.current_rev]),
+                    ?ELOG_INFO("Migration number ~p almost finished",
+                               [OldGH#g_hash_r.current_rev]),
                     do_table_finished_migration_cleanup(
                       TableName, OldOnlyChNames, OldOnlyBricks, AllBricks, S);
                true ->
@@ -1813,8 +1789,8 @@ do_table_finished_migration_cleanup(TableName, OldOnlyChNames, OldOnlyBricks,
                   ParentPid ! {clear_migmon_pid, TableName},
                   exit(normal)
           end),
-    ?APPLOG_INFO(?APPLOG_APPM_021,"Migration number ~p finished\n",
-                 [OldGH#g_hash_r.current_rev]),
+    ?ELOG_INFO("Migration number ~p finished",
+               [OldGH#g_hash_r.current_rev]),
     S#state{schema = NewSchema}.
 
 update_tab_ghash(TableName, T, NewGH, Schema) ->
@@ -1826,12 +1802,12 @@ update_tab_ghash(TableName, T, NewGH, Schema) ->
 %%      in chains that are no longer needed after migration has finished.
 
 stop_old_chains_and_bricks(OldOnlyChNames, OldOnlyBricks) ->
-    ?APPLOG_INFO(?APPLOG_APPM_022,"migration cleanup: old chains: ~p\n",
-                 [OldOnlyChNames]),
+    ?ELOG_INFO("migration cleanup: old chains: ~p",
+               [OldOnlyChNames]),
     [ok = stop_chmon(Ch) || Ch <- OldOnlyChNames],
     [_ = (catch brick_sb:delete_chain_history(Ch)) || Ch <- OldOnlyChNames],
-    ?APPLOG_INFO(?APPLOG_APPM_023,"migration cleanup: old bricks: ~p\n",
-                 [OldOnlyBricks]),
+    ?ELOG_INFO("migration cleanup: old bricks: ~p",
+               [OldOnlyBricks]),
     [_ = (catch stop_bp(Br, Nd)) || {Br, Nd} <- OldOnlyBricks],
     timer:sleep(1*1000),
     [_ = (catch stop_brick_del_history(Br, Nd)) || {Br, Nd} <- OldOnlyBricks],
@@ -1841,7 +1817,7 @@ stop_old_chains_and_bricks(OldOnlyChNames, OldOnlyBricks) ->
 
 stop_chmon(ChainName) ->
     MonName = brick_chainmon:chain2name(ChainName),
-    ?APPLOG_INFO(?APPLOG_APPM_024,"stop_chmon: stopping ~p\n", [MonName]),
+    ?ELOG_INFO("stop_chmon: stopping ~p", [MonName]),
     ok = sup_stop_status(supervisor:terminate_child(brick_mon_sup, MonName)),
     ok = sup_stop_status(supervisor:delete_child(brick_mon_sup, MonName)),
     ok.
@@ -1850,7 +1826,7 @@ stop_chmon(ChainName) ->
 
 stop_bp(BrickName, BrickNode) ->
     MonName = brick_bp:make_pinger_registered_name(BrickName),
-    ?APPLOG_INFO(?APPLOG_APPM_025,"stop_bp: stopping ~p on ~p\n", [MonName,BrickNode]),
+    ?ELOG_INFO("stop_bp: stopping ~p on ~p", [MonName,BrickNode]),
     ok = sup_stop_status(supervisor:terminate_child({brick_mon_sup, BrickNode}, MonName)),
     ok = sup_stop_status(supervisor:delete_child({brick_mon_sup, BrickNode}, MonName)),
     ok.
@@ -1858,11 +1834,11 @@ stop_bp(BrickName, BrickNode) ->
 %% @doc Stop a brick and delete its local log.
 
 stop_brick_del_history(BrickName, BrickNode) ->
-    ?APPLOG_INFO(?APPLOG_APPM_026,"Deleting brick history: {~p,~p}\n",
-                 [BrickName, BrickNode]),
+    ?ELOG_INFO("Deleting brick history: {~p,~p}",
+               [BrickName, BrickNode]),
     _ = brick_sb:delete_brick_history(BrickName, BrickNode),
-    ?APPLOG_INFO(?APPLOG_APPM_027,"Stopping old brick: {~p,~p}\n",
-                 [BrickName, BrickNode]),
+    ?ELOG_INFO("Stopping old brick: {~p,~p}",
+               [BrickName, BrickNode]),
     catch brick_shepherd:stop_brick(BrickName, BrickNode),
     catch gmt_hlog_common:full_writeback(?GMT_HLOG_COMMON_LOG_NAME),
     catch rpc:call(BrickNode,
@@ -1871,7 +1847,7 @@ stop_brick_del_history(BrickName, BrickNode) ->
                    gmt_hlog_common, permanently_unregister_local_brick,
                    [?GMT_HLOG_COMMON_LOG_NAME, BrickName]),
     RmCmd = "rm -rf " ++ gmt_hlog:log_name2data_dir(BrickName),
-    ?APPLOG_INFO(?APPLOG_APPM_028,"Stopping old brick, cmd = '" ++RmCmd++ "'\n",[]),
+    ?ELOG_INFO("Stopping old brick, cmd = '" ++RmCmd++ "'",[]),
     _ = rpc:call(BrickNode, os, cmd, [RmCmd]),
     ok.
 
@@ -1925,31 +1901,28 @@ squorum_get_keys(Bricks, Key, MaxNum) ->
 %% Intervals = first_time | integer()
 
 check_for_other_admin_server_beacons(Intervals, MyStartTime) ->
-    {ok, FailureInterval} = gmt_config_svr:get_config_value_i(
-                              heartbeat_failure_interval, 15),
+    {ok, FailureInterval} = application:get_env(gdss_admin, heartbeat_failure_interval),
     FailUSecs = FailureInterval * 1000*1000,
     check_for_other_admin_server_beacons(Intervals, MyStartTime, FailUSecs).
 
 check_for_other_admin_server_beacons(first_time, MyStartTime, FailUSecs) ->
     case running_admin_beacons_p(FailUSecs, MyStartTime) of
         false ->
-            ?APPLOG_INFO(?APPLOG_APPM_029,"First check for an Admin Server beacon "
-                         "found zero beacons.\n", []),
+            ?ELOG_INFO("First check for an Admin Server beacon "
+                       "found zero beacons."),
             ok;
         true ->
             %% Oh oh, we see a beacon from a running admin server.  We
             %% need to wait for the cluster timeout interval before
             %% we go any further.
-            ?APPLOG_WARNING(?APPLOG_APPM_030,"Beacon detected from another "
-                            "Admin Server, sleeping for "
-                            "heartbeat_failure_interval seconds.\n",
-                            []),
+            ?ELOG_WARNING("Beacon detected from another "
+                          "Admin Server, sleeping for "
+                          "heartbeat_failure_interval seconds."),
             timer:sleep(FailUSecs div 1000)
     end,
     check_for_other_admin_server_beacons(3, MyStartTime);
 check_for_other_admin_server_beacons(Intervals, MyStartTime, FailUSecs) ->
-    {ok, IntervalTime} = gmt_config_svr:get_config_value_i(
-                           heartbeat_beacon_interval, 1000),
+    {ok, IntervalTime} = application:get_env(gdss_admin, heartbeat_beacon_interval),
     WaitT = ((Intervals * IntervalTime) div 1000) + 1,
     NowT = gmt_time:time_t(),
     N = gmt_loop:do_while(
@@ -2116,8 +2089,8 @@ do_add_client_monitor(Node) ->
 
 do_delete_client_monitor(Node) ->
     Res = do_mod_client_monitor(Node, fun(Nd, OldList) -> OldList -- [Nd] end),
-    ?APPLOG_INFO(?APPLOG_APPM_031,"Deleting client monitors for node ~p: ~p\n",
-                 [Node, Res]),
+    ?ELOG_INFO("Deleting client monitors for node ~p: ~p",
+               [Node, Res]),
     [begin
          Name = client_monitor_name(Node, AppName),
          case (catch supervisor:terminate_child(brick_mon_sup, Name)) of
@@ -2151,16 +2124,14 @@ get_client_monitor_details() ->
 run_client_monitor_procs() ->
     Nodes = get_client_monitor_list(),
     NoOp = fun() -> ok end,
-    FunUp = fun(Node, App) -> ?APPLOG_INFO(?APPLOG_APPM_032,
-                                           "Node ~p application ~p is now running\n",
-                                           [Node, App]),
+    FunUp = fun(Node, App) -> ?ELOG_INFO("Node ~p application ~p is now running",
+                                         [Node, App]),
                               brick_admin:spam_gh_to_all_nodes(),
                               gmt_util:clear_alarm({client_node_down, Node},
                                                    NoOp)
             end,
-    FunDn = fun(Node, App) -> ?APPLOG_ALERT(?APPLOG_APPM_033,
-                                            "Node ~p application ~p is stopped\n",
-                                            [Node, App]),
+    FunDn = fun(Node, App) -> ?ELOG_ERROR("Node ~p application ~p is stopped",
+                                          [Node, App]),
                               gmt_util:set_alarm({client_node_down, Node},
                                                  "GDSS application is not "
                                                  "running on this node.", NoOp)
@@ -2188,8 +2159,8 @@ poll_brick_status(Brick, Node, PollSeconds) ->
                        last_not_available).
 
 poll_brick_status2(Brick, Node, 0, LastErr) ->
-    ?E_ERROR("~s:poll_brick_status2: ~p ~p -> ~p\n",
-             [?MODULE, Brick, Node, LastErr]),
+    ?E_ERROR("poll_brick_status2: ~p ~p -> ~p",
+             [Brick, Node, LastErr]),
     {error, LastErr};
 poll_brick_status2(Brick, Node, N, _LastErr) ->
     case (catch brick_server:status(Brick, Node, 100)) of
@@ -2252,9 +2223,8 @@ node_hostname(Node) when is_atom(Node) ->
 %% @doc Get GMT config server configuration value from remote node.
 
 remote_config_val(Node, Item) ->
-    Nonsense = "This is simply & obviously not a valid response",
-    case rpc:call(Node, gmt_config_svr, get_config_value, [Item, Nonsense]) of
-        {ok, Nonsense} ->
+    case rpc:call(Node, application, get_env, [Item]) of
+        undefined ->
             {error, not_found};
         Resp ->
             Resp
@@ -2420,7 +2390,7 @@ fast_sync_scav(StartNode, UpBrick, UpNode, NewBrick, NewNode, Opts) ->
 
                throttle_pid = ThrottlePid,
                exclusive_p = false,
-               log_fun = fun(Fmt, Args) -> ?APPLOG_INFO(?APPLOG_APPM_105,Fmt, Args) end,
+               log_fun = fun(Fmt, Args) -> ?ELOG_INFO(Fmt, Args) end,
                phase10_fun = fun fast_sync_bottom10/7},
     Fdoit = fun() ->
                     [rpc:call(Nd, error_logger, info_msg,
@@ -2470,7 +2440,7 @@ fast_sync_bottom10(SA, Finfolog, TempDir, TmpList4, _Bytes1,
                               end, SA#scav.options),
     Finfolog("Fast sync finished:\n"
              "\tOptions: ~p\n"
-             "\tCopied: hunks bytes errs = ~p ~p ~p\n",
+             "\tCopied: hunks bytes errs = ~p ~p ~p",
              [OptsNoDead, Hunks, Bytes, Errs]),
     os:cmd("rm -rf " ++ TempDir),
     normal.
@@ -2495,7 +2465,7 @@ fast_sync_one_seq_file_fun(TempDir, SA, ____Fread_blob, Finfolog,
                   Fread_and_send, {0, 0, 0, SA#scav.throttle_pid, 0}, DInLog),
             file:close(FH),
             disk_log:close(DInLog),
-            Finfolog("fast sync: Finished sequence ~p\n", [SeqNum]),
+            Finfolog("fast sync: Finished sequence ~p", [SeqNum]),
             {Hs + Hunks, Bs + Bytes, Es + Errs}
     end.
 

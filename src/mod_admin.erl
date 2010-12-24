@@ -26,8 +26,8 @@
 %% </ul>
 
 -module(mod_admin).
--include("applog.hrl").
 
+-include("gmt_elog.hrl").
 
 -compile([binary_comprehension]).
 
@@ -662,12 +662,12 @@ make_bootstrap_tables() ->
                   "<hr><hr><hr>\n"
                  ];
             true ->
-                 AAL = [{Nd, catch rpc:call(Nd, gmt_config, get_config_value,
-                                            [admin_server_distributed_nodes, ""])}
+                 AAL = [{Nd, catch rpc:call(Nd, application, get_env,
+                                            [gdss_admin, admin_server_distributed_nodes])}
                         || Nd <- Boots],
-                 AllEqualP = case lists:usort([Str || {_Nd, Str} <- AAL]) of
-                                 [Str] when Str == AdminStr -> true;
-                                 _                          -> false
+                 AllEqualP = case lists:usort([Bs || {_Nd, {ok,Bs}} <- AAL]) of
+                                 Boots -> true;
+                                 _     -> false
                              end,
                  AllBootstrapRunningP =
                      case lists:usort([catch net_adm:ping(Nd) || Nd<- Boots]) of
@@ -739,7 +739,7 @@ get_root(ModData) ->
             make_root_tables(TableList)
         catch
             _X:_Y ->
-                ?APPLOG_WARNING(?APPLOG_APPM_102,"table gen: ~p ~p at ~p\n", [_X, _Y, erlang:get_stacktrace()]),
+                ?ELOG_WARNING("table gen: ~p ~p at ~p", [_X, _Y, erlang:get_stacktrace()]),
                 make_bootstrap_tables()
         end,
 
@@ -994,12 +994,11 @@ get_bootstrap(Query, ModData) ->
         {ok, BtFile} = file:read_file(LocalBtFile),
         MyNode = node(),
         [begin spawn(Nd, fun() -> file:write_file(LocalBtFile, BtFile),
-                                  ?APPLOG_INFO(?APPLOG_APPM_103,
-                                               "Schema hint file ~s copied from ~p\n",
-                                               [LocalBtFile, MyNode]), timer:sleep(200)
+                                  ?ELOG_INFO("Schema hint file ~s copied from ~p",
+                                             [LocalBtFile, MyNode]), timer:sleep(200)
                          end),
-               ?APPLOG_INFO(?APPLOG_APPM_104,"Schema hint file ~s copied to ~p\n",
-                            [LocalBtFile, Nd])
+               ?ELOG_INFO("Schema hint file ~s copied to ~p",
+                          [LocalBtFile, Nd])
          end || Nd <- Boots],
         Head = [
                 <<"<html>\r\n">>,
@@ -1078,16 +1077,8 @@ integer_to_list_or_no_serial(CUS) ->
     integer_to_list(CUS).
 
 read_bootstrap_nodes() ->
-    AdminStr = gmt_config:get_config_value(admin_server_distributed_nodes, ""),
-    if AdminStr == "";
-       AdminStr == "'gdss1@machineA', 'gdss1@machine-B-with-hyphens'" ->
-            {AdminStr, []};
-       true ->
-            %% Use binary for flattening perhaps improper list.
-            ALB = re:replace(AdminStr, " ", "", [global, {return, list}]),
-            %% | is a nonsense split char.
-            {AdminStr, make_proplist(lists:flatten(ALB), ",", "|")}
-    end.
+    {ok, AdminNodes} = application:get_env(gdss_admin, admin_server_distributed_nodes),
+    {io_lib:format("~p", [AdminNodes]), AdminNodes}.
 
 add_table_html_form(TabName, SubmitURI) ->
     [
@@ -1413,8 +1404,7 @@ dump_history_in_columns() ->
     history_to_string_columns(get_history()).
 
 admin_server_http_port() ->
-    {ok, Port} =
-        gmt_config_svr:get_config_value_i(brick_admin_http_tcp_port, 23080),
+    {ok, Port} = application:get_env(gdss_admin, brick_admin_http_tcp_port),
     Port.
 
 %% helper funcs.

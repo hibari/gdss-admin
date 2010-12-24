@@ -21,8 +21,6 @@
 %% "brick pingers" and chain health monitors.
 
 -module(brick_mon_sup).
--include("applog.hrl").
-
 
 -behaviour(supervisor).
 

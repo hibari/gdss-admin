@@ -24,12 +24,7 @@
 -include("brick_hash.hrl").
 -include("brick_public.hrl").
 -include("gmt_hlog.hrl").
-
--ifdef(debug_brick_test0).
--define(gmt_debug, true).
--endif.
-%%-define(gmt_debug, true).                     %QQQXXXYYYZZZ debugging
--include("gmt_debug.hrl").
+-include("gmt_elog.hrl").
 
 -define(M, brick_server).
 -define(SQ, brick_squorum).
@@ -416,7 +411,6 @@ t3(BrickName, Node) ->
     {ok, {ManyRes3, false}} = ?M:get_many(BrickName, Node, ?BRICK__GET_MANY_FIRST, 1111),
     ManyRes3Keys = [Key || {Key, _, _, _, _} <- ManyRes3],
     ManyRes3Keys = Fbin(["15", "16", "17", "30", "31", "50", "55", "56", "57"]),
-    ?DBG(res3_done),
 
     ok = ?M:delete(BrickName, Node, "30"),
     ok = ?M:set(BrickName, Node, "32", "32-new"),
@@ -965,8 +959,6 @@ t60_get(Nodes, BrickName, RS = Summary) ->
                                             DF <- DamageFuns,
                                             F  <- WitnessVariations],
     _R = lists:map(Fdel_combinations, Damage_plus_Flags_Vars),
-    ?DBG(Damage_plus_Flags_Vars),
-    ?DBG(_R),
 
     %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
     %% Not-so-perfect case: Some bricks available.
@@ -974,7 +966,6 @@ t60_get(Nodes, BrickName, RS = Summary) ->
     %% Check all combinations of witness or not.
     Fdown_combinations =
         fun({DownNodes, _DamageFun, Flags}) ->
-                ?DBG({DownNodes, Flags}),
                 [_ = rpc:call(Node, brick_shepherd, start_brick,
                               [BrickName, []]) || Node <- Nodes],
                 timer:sleep(100),
@@ -1010,7 +1001,6 @@ t60_get(Nodes, BrickName, RS = Summary) ->
             timer:sleep(4000);
        true ->
             _R2 = lists:map(Fdown_combinations, Damage_plus_Flags_Vars),
-            ?DBG(_R2),
             %% Start all bricks again, to put everyone into known state
             [rpc:call(Node, brick_shepherd, start_brick,
                       [BrickName, []]) || Node <- Nodes]
@@ -1303,10 +1293,10 @@ cl_chain_all() ->
     ok = brick_test0:chain_all().
 
 cl_simple_distrib_test(_X) ->
-    ?DBG(_X).
+    _X.
 
 cl_old_distrib_test(_X) ->
-    ?DBG(_X).
+    _X.
 
 loopN(N, Fun) ->
     loopN2(N, Fun, false).
@@ -1367,7 +1357,7 @@ wait_for_checkpoint_to_finish(BrickName, Node) ->
                         undefined ->
                             {false, done};
                         Pid ->
-                            if Pid /= X -> ?DBG(Pid); true -> ok end,
+                            if Pid /= X -> Pid; true -> ok end,
                             timer:sleep(100),
                             {true, Pid}
                     end
@@ -1513,8 +1503,6 @@ chain_t10(NameHead, NameTail, StartupP, InsertP, EtsTestP, KillP, OptionList) ->
     if EtsTestP == true ->
             HM2 = xform_ets_dump(NameHead, ets:tab2list(NameHeadETS)),
             TM2 = xform_ets_dump(NameTail, ets:tab2list(NameTailETS)),
-            ?DBG(HM2),
-            ?DBG(TM2),
             HM2 = TM2,
             io:format("GOOD, both bricks are equal.\n");
        true ->
@@ -1733,10 +1721,6 @@ chain_t25(OptionList) ->
     GH1 = GH1_0#g_hash_r{minor_rev = GH#g_hash_r.minor_rev + 1},
     ok = ?M:chain_hack_set_global_hash(Ch1Head, Node, GH1),
     ok = ?M:chain_hack_set_global_hash(Ch1Middle, Node, GH1),
-
-?DBG(?M:chain_get_my_repair_state(Ch1Head, Node)),
-?DBG(?M:chain_get_ds_repair_state(Ch1Head, Node)),
-?DBG(?M:chain_get_my_repair_state(Ch1Middle, Node)),
 
     %% Try again with the shorter tail.
     ok = F_stolen_from_chain_t20(GH1),
@@ -2261,15 +2245,6 @@ chain_t40(OptionList) ->
     ?DBG_GENx({?MODULE,?LINE,?M:chain_get_downstream_serials(BrickName, Node)}),
     timer:sleep(1000),
     ?DBG_GENx({?MODULE,?LINE,?M:chain_get_downstream_serials(BrickName, Node)}),
-
-%% ?DBG(gggggggggggggggggggggggggggggggggggggggg),
-%%     [spawn(fun() -> ?M:set(BrickName, Node, X, X) end) ||
-%%      X <- lists:seq(1,250)],
-%%      timer:sleep(3000),
-%% ?DBG(?M:chain_get_downstream_serials(BrickName, Node)),
-%% timer:sleep(1000),
-%% ?DBG(?M:chain_get_downstream_serials(BrickName, Node)),
-%% ?DBG(?M:status(BrickName, Node)),
 
     AllBricks = lists:append([BrickList || {_, BrickList} <- ChainGrp]),
     [rpc:call(NodeX, brick_shepherd, stop_brick, [Brick]) ||
@@ -2991,14 +2966,14 @@ chain_t56(OptionList) ->
     Ch1B2 = list_to_atom(MyBase ++ "_ch1_b2"),
     F_stopstart = fun() ->
                           catch flush_common_log(),
-                          error_logger:info_msg("Test stopping gdss app\n"),
+                          ?ELOG_INFO("Test stopping gdss app"),
                           StopRes = (catch ok = reliable_gdss_stop()),
-                          error_logger:info_msg("Test stopping gdss res: ~p\n",
-                                                 [StopRes]),
+                          ?ELOG_INFO("Test stopping gdss res: ~p",
+                                  [StopRes]),
                           os:cmd("rm *" ++ MyBase ++ "*"),
                           os:cmd("rm -rf hlog.*" ++ MyBase ++ "*"),
                           os:cmd("rm -rf hlog.commonLogServer"),
-                          error_logger:info_msg("Test starting gdss app\n"),
+                          ?ELOG_INFO("Test starting gdss app"),
                           ok = application:start(gdss)
                   end,
     F_stopstart(),
@@ -3013,9 +2988,8 @@ chain_t56(OptionList) ->
     [ok = brick_simple:set(Tab, "goo"++integer_to_list(X), "val!") ||
         X <- lists:seq(1, 20)],
 
-    error_logger:info_msg(
-      "Kill ~p, wait a little bit, then kill ~p while ~p is still\n"
-      " under repair.\n", [Ch1B1, Ch1B2, Ch1B1]),
+    ?ELOG_INFO("Kill ~p, wait a little bit, then kill ~p while ~p is still\n"
+            " under repair.", [Ch1B1, Ch1B2, Ch1B1]),
     file:write_file("debug_chain_props",
                     term_to_binary([{max_keys_per_iter, 1},
                                     {repair_ack_sleep, 500},
@@ -3035,7 +3009,7 @@ chain_t56(OptionList) ->
     _ = my_repair_poll(Ch1B2, node(), 500),
     ok = brick_server:chain_get_my_repair_state(Ch1B2, node()),
     io:format("\n\nDEBUG: test56: after repair state 2\n\n"),
-    error_logger:info_msg("Kill test passed\n"),
+    ?ELOG_INFO("Kill test passed"),
 
     case proplists:get_value(test, OptionList) of
         undefined ->
@@ -3064,14 +3038,14 @@ chain_t100() ->
     Ch1B2 = list_to_atom(MyBase ++ "_ch1_b2"),
     F_stopstart = fun() ->
                           catch flush_common_log(),
-                          error_logger:info_msg("Test stopping gdss app\n"),
+                          ?ELOG_INFO("Test stopping gdss app\n"),
                           StopRes = (catch ok = reliable_gdss_stop()),
-                          error_logger:info_msg("Test stopping gdss res: ~p\n",
+                          ?ELOG_INFO("Test stopping gdss res: ~p\n",
                                                  [StopRes]),
                           os:cmd("rm *" ++ MyBase ++ "*"),
                           os:cmd("rm -rf hlog.*" ++ MyBase ++ "*"),
                           os:cmd("rm -rf hlog.commonLogServer"),
-                          error_logger:info_msg("Test starting gdss app\n"),
+                          ?ELOG_INFO("Test starting gdss app\n"),
                           ok = application:start(gdss)
                   end,
     F_stopstart(),
@@ -3086,7 +3060,7 @@ chain_t100() ->
     [ok = brick_simple:set(Tab, "goo"++integer_to_list(X), "val!") ||
         X <- lists:seq(1, 200)],
 
-    error_logger:info_msg(
+    ?ELOG_INFO(
       "Kill ~p, then wait a little bit, then suspend ~p, "
       "then see what happens\n", [Ch1B2, Ch1B2]),
     %% The 5 x 100 x 100 delay factors will have repair take roughly 2 secs.
@@ -3096,14 +3070,14 @@ chain_t100() ->
                                     {repair_round1_ack_sleep, 100},
                                     {repair_finished_sleep, 35*1000}])),
     exit(whereis(Ch1B2), kill),
-    error_logger:warning_msg("\n\nKill of ~p done\n\n\n\n", [Ch1B2]),
+    ?ELOG_WARNING("\n\nKill of ~p done\n\n\n\n", [Ch1B2]),
     timer:sleep(15*1000),
     %% Don't forget to delete this temp debugging file!
     %% Besides, we don't want the extra delay for the second round of
     %% repairs.
     file:delete("debug_chain_props"),
     timer:sleep(45*1000),
-    error_logger:warning_msg("\n\nOK, done with sleep\n\n\n\n", []),
+    ?ELOG_WARNING("\n\nOK, done with sleep\n\n\n\n", []),
     timer:sleep(500),
 
     %% {sigh}  Hopefully I've got the timing of this check correct.
@@ -3149,14 +3123,14 @@ chain_t101() ->
     file:delete("debug_chain_props"),
     F_stopstart = fun() ->
                           catch flush_common_log(),
-                          error_logger:info_msg("Test stopping gdss app\n"),
+                          ?ELOG_INFO("Test stopping gdss app\n"),
                           StopRes = (catch ok = reliable_gdss_stop()),
-                          error_logger:info_msg("Test stopping gdss res: ~p\n",
+                          ?ELOG_INFO("Test stopping gdss res: ~p\n",
                                                  [StopRes]),
                           os:cmd("rm *" ++ MyBase ++ "*"),
                           os:cmd("rm -rf hlog.*" ++ MyBase ++ "*"),
                           os:cmd("rm -rf hlog.commonLogServer"),
-                          error_logger:info_msg("Test starting gdss app\n"),
+                          ?ELOG_INFO("Test starting gdss app\n"),
                           ok = application:start(gdss)
                   end,
     F_stopstart(),
@@ -3168,13 +3142,13 @@ chain_t101() ->
                 Tab, 4, lists:duplicate(4, node())),
     brick_admin:add_table(Tab, ChDescr, TabOptions ++ OptionList),
     timer:sleep(25*1000),
-    error_logger:info_msg("\n\nOK, all table setup done\n\n\n"),
+    ?ELOG_INFO("\n\nOK, all table setup done\n\n\n"),
 
     %% More setup, to get the debug_chain_props into brick #3.
     exit(whereis(tab101_ch3_b3), kill),
     %% This is going to take a while.
     timer:sleep(25*1000),
-    error_logger:info_msg("\n\nOK, done with sleep waiting for brick #3\n\n\n\n", []),
+    ?ELOG_INFO("\n\nOK, done with sleep waiting for brick #3\n\n\n\n", []),
     timer:sleep(1*1000),
 
     [brick_server:set_do_sync({Br, node()}, false) || Br <- [tab101_ch3_b1, tab101_ch3_b2, tab101_ch3_b3, tab101_ch3_b4]],
@@ -3190,14 +3164,14 @@ chain_t101() ->
     [brick_simple:set(tab101, "/zar/zar/"++integer_to_list(X), "BAR!") ||
         X <- lists:seq(1,100)],
     timer:sleep(11*1000),
-    error_logger:info_msg("AAAAAA\n"),
+    ?ELOG_INFO("AAAAAA\n"),
     [brick_simple:delete(tab101, "/zar/zar/"++integer_to_list(X)) ||
         X <- lists:seq(25,90)],
 
-    error_logger:info_msg("\n\nOK, done with sleep\n\n\n\n", []),
+    ?ELOG_INFO("\n\nOK, done with sleep\n\n\n\n", []),
     timer:sleep(11*1000),
     file:delete("debug_chain_props"),
-    error_logger:info_msg("\n\nOK, done with sleep again, deleted debug file\n\n\n\n", []),
+    ?ELOG_INFO("\n\nOK, done with sleep again, deleted debug file\n\n\n\n", []),
 
     Dump1 = xform_ets_dump(tab101_ch3_b1, ets:tab2list(tab101_ch3_b1_store)),
     Dump2 = xform_ets_dump(tab101_ch3_b2, ets:tab2list(tab101_ch3_b2_store)),
@@ -3234,14 +3208,14 @@ chain_t102() ->
     Node = node(),
     F_stopstart = fun() ->
                           catch flush_common_log(),
-                          error_logger:info_msg("Test stopping gdss app\n"),
+                          ?ELOG_INFO("Test stopping gdss app\n"),
                           StopRes = (catch ok = reliable_gdss_stop()),
-                          error_logger:info_msg("Test stopping gdss res: ~p\n",
+                          ?ELOG_INFO("Test stopping gdss res: ~p\n",
                                                  [StopRes]),
                           os:cmd("rm *" ++ MyBase ++ "*"),
                           os:cmd("rm -rf hlog.*" ++ MyBase ++ "*"),
                           os:cmd("rm -rf hlog.commonLogServer"),
-                          error_logger:info_msg("Test starting gdss app\n"),
+                          ?ELOG_INFO("Test starting gdss app\n"),
                           ok = application:start(gdss)
                   end,
     F_stopstart(),
@@ -3253,7 +3227,7 @@ chain_t102() ->
                 Tab, 3, lists:duplicate(6, Node)),
     brick_admin:add_table(Tab, ChDescr, TabOptions ++ OptionList),
     timer:sleep(15*1000),
-    error_logger:info_msg("\n\nOK, all table setup done\n\n\n"),
+    ?ELOG_INFO("\n\nOK, all table setup done\n\n\n"),
 
     %% OK, now the final setup steps.
     ok = brick_shepherd:add_do_not_restart_brick(Ch1B1, Node),
@@ -3291,14 +3265,14 @@ chain_t103() ->
     Node = node(),
     F_stopstart = fun() ->
                           catch flush_common_log(),
-                          error_logger:info_msg("Test stopping gdss app\n"),
+                          ?ELOG_INFO("Test stopping gdss app\n"),
                           StopRes = (catch ok = reliable_gdss_stop()),
-                          error_logger:info_msg("Test stopping gdss res: ~p\n",
+                          ?ELOG_INFO("Test stopping gdss res: ~p\n",
                                                  [StopRes]),
                           os:cmd("rm *" ++ MyBase ++ "*"),
                           os:cmd("rm -rf hlog.*" ++ MyBase ++ "*"),
                           os:cmd("rm -rf hlog.commonLogServer"),
-                          error_logger:info_msg("Test starting gdss app\n"),
+                          ?ELOG_INFO("Test starting gdss app\n"),
                           ok = application:start(gdss)
                   end,
     F_stopstart(),
@@ -3313,14 +3287,14 @@ chain_t103() ->
     ok = brick_admin:add_table(Tab, ChDescr1,
                                TabOptions ++ TabWeights1 ++ OptionList),
     timer:sleep(8*1000),
-    error_logger:info_msg("\n\nOK, all table setup done\n\n\n"),
+    ?ELOG_INFO("\n\nOK, all table setup done\n\n\n"),
 
     NumKeysPerY = 100,
     [brick_simple:set(Tab, "/x"++integer_to_list(X)++"/y"++integer_to_list(Y), "foo!") ||
         X <- lists:seq(0,2), Y <- lists:seq(1, NumKeysPerY)],
     LH2 = brick_hash:chash_init(via_proplist, ChDescr2,
                                 TabOptions ++ TabWeights2 ++ OptionList),
-    error_logger:warning_msg("Starting migration\n"),
+    ?ELOG_WARNING("Starting migration\n"),
     {ok, _MigTime} = brick_admin:start_migration(
                       Tab, LH2,
                       [{max_keys_per_iter, 20}, {propagation_delay, 500}]),
@@ -3328,7 +3302,7 @@ chain_t103() ->
          timer:sleep(250),
          NNN0 = slurp_all(Tab, <<"/x0/">>, 100),
          NNN = lists:sort(NNN0), % won't return keys in order, it's dumb.
-         %error_logger:warning_msg("SLURP got ~p: ~p - ~p\n", [length(NNN0), element(1,hd(NNN)), element(1,lists:last(NNN))]),
+         %?ELOG_WARNING("SLURP got ~p: ~p - ~p\n", [length(NNN0), element(1,hd(NNN)), element(1,lists:last(NNN))]),
          %% Here's the main sanity check: correct length?
          NumKeysPerY = length(NNN)
      end || _ <- lists:seq(1, 30)],
@@ -3441,8 +3415,6 @@ chain_t60(NameHead, NameTail, StartupP, InsertP, EtsTestP, KillP, OptionList) ->
         EtsTestP == true ->
             HM2 = xform_ets_dump(NameHead, ets:tab2list(NameHeadETS)),
             TM2 = xform_ets_dump(NameTail, ets:tab2list(NameTailETS)),
-            ?DBG(HM2),
-            ?DBG(TM2),
             HM2 = TM2,
             io:format("GOOD, both bricks are equal:~n~p~n~p~n.\n", [HM2, TM2]);
         true ->
@@ -3515,7 +3487,7 @@ chain_t61(OptionList) ->
     poll_migration_finished(FirstBrick),
     [{ok, _, _} = brick_server:migration_clear_sweep(Br, Nd) ||
         {Br, Nd} <- FirstBrick],
-    error_logger:info_msg("Test race1 finished\n"),
+    ?ELOG_INFO("Test race1 finished\n"),
 
 %     Race condition #2:
 %     a. Send set for K.
@@ -3588,7 +3560,7 @@ chain_t61(OptionList) ->
     poll_migration_finished(BothBricks),
     [{ok, _, _} = brick_server:migration_clear_sweep(Br, Nd) ||
         {Br, Nd} <- BothBricks],
-    error_logger:info_msg("Test race3 finished\n"),
+    ?ELOG_INFO("Test race3 finished\n"),
 
     %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
     %% Race condition #4: Start a slow migration, kill a brick, then
@@ -3617,7 +3589,7 @@ chain_t61(OptionList) ->
     %% Do not use Fstop_start() here: it will delete our brick's state!
 % io:format("DBG: dumping Name1 log\n"),
 % brick_ets:debug_scan("hlog.regression_1"),
-    error_logger:info_msg("Stopping ~p\n", [Name1]),
+    ?ELOG_INFO("Stopping ~p\n", [Name1]),
     ?M:stop(Name1),
     catch exit(whereis(Name1), kill), timer:sleep(50),
     io:format("DBG: whereis(Name1) = ~p\n", [whereis(Name1)]),
@@ -3627,7 +3599,7 @@ chain_t61(OptionList) ->
     ?M:chain_role_standalone(Name1, Node),
     ?M:chain_set_my_repair_state(Name1, Node, ok),
     brick_server:chain_hack_set_global_hash(Name1, Node, GHmig4),
-    error_logger:info_msg("Startup of ~p finished, start sweeping\n", [Name1]),
+    ?ELOG_INFO("Startup of ~p finished, start sweeping\n", [Name1]),
 % io:format("DBG: dumping Name1 log AGAIN\n"),
 % brick_ets:debug_scan("hlog.regression_1"),
     ok = brick_server:migration_start_sweep(Name1, Node, foocookie, Chain1Name,
@@ -3641,7 +3613,7 @@ chain_t61(OptionList) ->
     poll_migration_finished(BothBricks),
     [{ok, _, _} = brick_server:migration_clear_sweep(Br, Nd) ||
         {Br, Nd} <- BothBricks],
-    error_logger:info_msg("Test race4 finished\n"),
+    ?ELOG_INFO("Test race4 finished\n"),
 
     catch brick_server:stop(Name1),
     catch brick_server:stop(Name2),
@@ -3742,11 +3714,9 @@ repair_poll(Brick, Node, PollMs, PollFunc) ->
     RepairPoll = fun(Acc) ->
                          case (catch ?M:PollFunc(Brick, Node)) of
                              ok ->
-                                 ?DBG({repair_poll, Brick, Node, ok}),
                                  {false, Acc};
                              _St ->
                                  io:format("rp ~w ~w ~w ~w, ", [PollFunc, Brick, Node, _St]),
-                                 ?DBG({repair_poll, Brick, Node, _St}),
                                  timer:sleep(PollMs),
                                  {true, Acc + 1}
                          end
@@ -3757,11 +3727,9 @@ sync_poll(Brick, Node, PollMs) ->
     SyncPoll = fun(Acc) ->
                        case ?M:chain_get_downstream_serials(Brick, Node) of
                            {X, X} ->
-                               ?DBG({sync_poll, Brick, Node, ok}),
                                {false, Acc};
                            _St ->
                                io:format("sp: ~p\n", [_St]),
-                               ?DBG({sync_poll, Brick, Node, _St}),
                                timer:sleep(PollMs),
                                {true, Acc + 1}
                        end
@@ -3854,11 +3822,10 @@ chain_start_entire_N(BrickList, Options, FullStartP) when length(BrickList) > 2 
                                                   [{official_tail, false}]),
             lists:foreach(
               fun([{Up, UpNode}, {Mid, MidNode}, {Down, DownNode}] =_QQQ) ->
-?DBG(_QQQ),
                       ok = brick_server:chain_role_middle(Mid, MidNode,
-                                                              Up, UpNode,
-                                                              Down, DownNode,
-                                                              [{official_tail, false}])
+                                                          Up, UpNode,
+                                                          Down, DownNode,
+                                                          [{official_tail, false}])
               end, Triples),
 
             ok = brick_server:chain_get_my_repair_state(Head, NodeHead),

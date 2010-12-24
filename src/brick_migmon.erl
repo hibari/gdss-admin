@@ -18,8 +18,8 @@
 %%%----------------------------------------------------------------------
 
 -module(brick_migmon).
--include("applog.hrl").
 
+-include("gmt_elog.hrl").
 
 -behaviour(gen_fsm).
 
@@ -73,15 +73,15 @@ init([T, Options]) ->
 %%          {stop, Reason, NewStateData}
 %%----------------------------------------------------------------------
 chains_starting(trigger, S) when is_record(S, state) ->
-    ?APPLOG_INFO(?APPLOG_APPM_054,"Migration monitor: ~w: chains starting\n",
-                 [(S#state.tab)#table_r.name]),
+    ?ELOG_INFO("Migration monitor: ~w: chains starting",
+               [(S#state.tab)#table_r.name]),
     Start = now(),
     T = S#state.tab,
     GH = T#table_r.ghash,
 
     AllChains = lists:usort(brick_hash:all_chains(GH, current)
                             ++ brick_hash:all_chains(GH, new)),
-    ?APPLOG_INFO(?APPLOG_APPM_055,"~s: AllChains = ~p\n", [?MODULE, AllChains]),
+    ?ELOG_INFO("AllChains = ~p", [AllChains]),
     lists:map(
       fun({ChainName, _}) ->
               gmt_loop:do_while(
@@ -89,7 +89,8 @@ chains_starting(trigger, S) when is_record(S, state) ->
                         case brick_sb:get_status(chain, ChainName) of
                             {ok, healthy}  -> {false, X};
                             {ok, degraded} -> {false, X};
-                            _X             -> ?APPLOG_INFO(?APPLOG_APPM_056,"Migration monitor: ~w status ~w\n", [ChainName, _X]),
+                            _X             -> ?ELOG_INFO("Migration monitor: ~w status ~w",
+                                                         [ChainName, _X]),
                                               timer:sleep(1000),
                                               {true, X}
                         end
@@ -98,8 +99,8 @@ chains_starting(trigger, S) when is_record(S, state) ->
     gen_fsm:send_event(self(), trigger),
     case timer:now_diff(now(), Start) of
         N when N < 1*1000*1000 ->
-            ?APPLOG_INFO(?APPLOG_APPM_057,"Migration monitor: ~w: sweeps starting\n",
-                         [(S#state.tab)#table_r.name]),
+            ?ELOG_INFO("Migration monitor: ~w: sweeps starting",
+                       [(S#state.tab)#table_r.name]),
             {next_state, migrating, S};
         _ ->
             timer:sleep(1000),
@@ -214,9 +215,6 @@ do_check_migration(S) ->
                               _Err ->
                                   ok
                                   %% TODO: what else?
-                                  %%error_logger:error_msg(
-                                  %%  "check_migration: table ~p: brick ~p: ~p\n",
-                                  %%  [TableName, _Br, _Err])
                           end,
                           case (catch brick_server:status(HeadBrick, HeadNode,
                                                           MyTimeout)) of
@@ -232,8 +230,8 @@ do_check_migration(S) ->
                                   DoneCount
                           end
                   end, 0, AllActiveChains),
-                                                %       io:format("N = ~p, wanted = ~p, AllActiveChains = ~p\n",
-                                                %                 [N, length(AllActiveChains), AllActiveChains]),
+            %%       io:format("N = ~p, wanted = ~p, AllActiveChains = ~p\n",
+            %%                 [N, length(AllActiveChains), AllActiveChains]),
             if N == length(AllActiveChains) ->
                     brick_admin:table_finished_migration(TableName),
                     ok;
@@ -244,7 +242,7 @@ do_check_migration(S) ->
         end
     catch
         X:Y ->
-            ?APPLOG_ALERT(?APPLOG_APPM_058,"check_migration_table: ~p: ~p ~p\n", [TableName, X, Y]),
+            ?ELOG_ERROR("check_migration_table: ~p: ~p ~p", [TableName, X, Y]),
             S
     end.
 

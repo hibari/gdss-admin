@@ -29,19 +29,11 @@
 %% `check_status' clause.
 
 -module(brick_bp).
--include("applog.hrl").
-
 
 -behaviour(gen_fsm).
 
 -include("brick.hrl").
 -include("brick_admin.hrl").
-
--ifdef(debug_bp).
--define(gmt_debug, true).
--endif.
-%%-define(gmt_debug, true).                     %QQQXXXYYYZZZ debugging
--include("gmt_debug.hrl").
 
 %% API
 -export([start_link/4, stop_pinger/1,
@@ -95,7 +87,6 @@ start_link(Name, Brick, Node, BrickOptions) ->
                        [Name, Brick, Node, BrickOptions], []).
 
 start_pingers(Bricks, BrickOptions) ->
-    ?DBG({start_pingers, Bricks}),
     lists:foreach(
       fun({Brick, Node} = _B) ->
               Name = make_pinger_registered_name(Brick),
@@ -152,12 +143,11 @@ state(Pid) ->
 %%--------------------------------------------------------------------
 init([_Name, Brick, Node, BrickOptions] = _Arg) ->
     random:seed(now()),
-    {ok, Time} = gmt_config_svr:get_config_value_i(admin_server_brick_poll, 1400),
+    {ok, Time} = application:get_env(gdss_admin, admin_server_brick_poll),
     {ok, TRef} = brick_itimer:send_interval(Time, check_status),
-    {ok, SleepRnd} = gmt_config_svr:get_config_value_i(admin_server_brick_pinger_sleep_random, 900),
+    {ok, SleepRnd} = application:get_env(gdss_admin, admin_server_brick_pinger_sleep_random),
     self() ! send_initial_status_report,
     StName = unknown,
-    ?DBG({?MODULE, _Arg}),
     {ok, StName, #state{brick = Brick, node = Node,
                         brick_options = BrickOptions, tref = TRef,
                         out_of_unknown_p = false, sleep_random = SleepRnd}}.

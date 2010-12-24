@@ -84,8 +84,6 @@
 %% call into question the role/wisdom of the scoreboard.
 
 -module(brick_chainmon).
--include("applog.hrl").
-
 
 -behaviour(gen_fsm).
 
@@ -204,7 +202,7 @@ state(ServerRef) ->
 init([Chain, Bricks]) ->
     self() ! finish_init_tasks,
     random:seed(now()),
-    {ok, Time} = gmt_config_svr:get_config_value_i(admin_server_chain_poll, 4000),
+    {ok, Time} = application:get_env(gdss_admin, admin_server_chain_poll),
     {ok, TRef} = brick_itimer:send_interval(Time, check_status),
     SBPid = brick_sb:sb_pid(),
     {ok, _} = gmt_util:make_monitor(SBPid),
@@ -934,15 +932,15 @@ process_brickstatus_diffs(degraded = StateName, DiffList, LastBricksStatus,
             %%
             %% Fix: specifically force the wayward brick back to pre_init
             %% state.
-            error_logger:info_msg("Chain monitor: ~p: force ~p from ok -> pre_init\n",
-                                  [S#state.chain, Brick]),
+            ?E_INFO("Chain monitor: ~p: force ~p from ok -> pre_init\n",
+                    [S#state.chain, Brick]),
             ok = brick_server:chain_set_my_repair_state(
                    BrName, NdName, force_ok_to_pre_init),
             PingerName = brick_bp:make_pinger_registered_name(BrName),
             brick_sb:report_brick_status(BrName, NdName, pre_init,
                                          [chain_monitor_adjustment]),
-            error_logger:info_msg("Chain monitor: ~p: restart ~p\n",
-                                  [S#state.chain, PingerName]),
+            ?E_INFO("Chain monitor: ~p: restart ~p\n",
+                    [S#state.chain, PingerName]),
             exit(whereis(PingerName), kill),
             PreInitNBS = substitute_prop(LastBricksStatus, Brick, unknown2),
 %           PreInitNBS = LastBricksStatus, % Which is the correct one?

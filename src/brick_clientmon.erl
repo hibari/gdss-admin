@@ -18,8 +18,8 @@
 %%%-------------------------------------------------------------------
 
 -module(brick_clientmon).
--include("applog.hrl").
 
+-include("gmt_elog.hrl").
 
 -behaviour(gen_server).
 
@@ -142,9 +142,8 @@ do_check_status(S) ->
 do_up(S) when not S#state.is_up ->
     case (catch (S#state.fun_up)(S#state.node, S#state.app_name)) of
         {'EXIT', Reason} ->
-            ?APPLOG_ALERT(?APPLOG_APPM_044,"~s:do_up: EXIT for ~p ~p -> ~p\n",
-                          [?MODULE, S#state.node, S#state.app_name,
-                           Reason]);
+            ?ELOG_ERROR("do_up: EXIT for ~p ~p -> ~p",
+                        [S#state.node, S#state.app_name, Reason]);
         _ ->
             ok
     end;
@@ -154,9 +153,8 @@ do_up(_) ->
 do_down(S) when S#state.is_up ->
     case (catch (S#state.fun_down)(S#state.node, S#state.app_name)) of
         {'EXIT', Reason} ->
-            ?APPLOG_ALERT(?APPLOG_APPM_045,"~s:do_down: EXIT for ~p ~p -> ~p\n",
-                          [?MODULE, S#state.node, S#state.app_name,
-                           Reason]);
+            ?ELOG_ERROR("do_down: EXIT for ~p ~p -> ~p",
+                        [S#state.node, S#state.app_name, Reason]);
         _ ->
             ok
     end;

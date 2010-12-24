@@ -32,18 +32,13 @@
 %% `brick_admin' server to be running first.
 
 -module(brick_sb).
--include("applog.hrl").
 
+-include("gmt_elog.hrl").
 
 -behaviour(gen_server).
 
 -include("brick.hrl").
 -include("brick_admin.hrl").
-
--ifdef(debug_sb).
--define(gmt_debug, true).
--endif.
--include("gmt_debug.hrl").
 
 %% API
 -export([start_link/0,
@@ -238,7 +233,7 @@ handle_call({link_me_to_sb, Pid}, _From, State) ->
     link(Pid),
     {reply, true, State};
 handle_call(_Request, _From, State) ->
-    ?APPLOG_WARNING(?APPLOG_APPM_059,"Hey: ~s handle_call: Request = ~w\n", [?MODULE, _Request]),
+    ?ELOG_WARNING("Request = ~w", [_Request]),
     Reply = err,
     {reply, Reply, State}.
 
@@ -249,7 +244,6 @@ handle_call(_Request, _From, State) ->
 %% Description: Handling cast messages
 %%--------------------------------------------------------------------
 handle_cast({report_status, _Key, _What, _Status, _PropList} = Msg, State) ->
-    ?DBG({report_status, Key, Status, PropList}),
     Msgs = [Msg|get_other_report_status_msgs()],
     {OxsRev, NewState} = lists:foldl(fun(M, {OxList, S}) ->
                                              case make_status_report_op(M, S) of
@@ -274,8 +268,8 @@ handle_cast({report_status, _Key, _What, _Status, _PropList} = Msg, State) ->
         ok  ->
             {noreply, NewState};
         Err ->
-            ?APPLOG_ALERT(?APPLOG_APPM_060, "~s: squorum set failure: ~P: ~w\n",
-                          [?MODULE, OxsRev, 10, Err]),
+            ?ELOG_ERROR("squorum set failure: ~P: ~w",
+                        [OxsRev, 10, Err]),
             {noreply, NewState}
     end;
 handle_cast({delete_history, Key}, State) ->
@@ -291,7 +285,7 @@ handle_cast({delete_history, Key}, State) ->
             {noreply, State}
     end;
 handle_cast(_Msg, State) ->
-    ?APPLOG_WARNING(?APPLOG_APPM_061,"Hey: ~s handle_cast: Msg = ~w\n", [?MODULE, _Msg]),
+    ?ELOG_WARNING("Request = ~w", [_Msg]),
     {noreply, State}.
 
 %%--------------------------------------------------------------------
@@ -334,7 +328,7 @@ handle_info({'EXIT', Pid, Why}, State) ->
     ?E_INFO("~s: pid ~p exit reason ~p", [?MODULE, Pid, Why]),
     {noreply, State};
 handle_info(_Info, State) ->
-    ?APPLOG_WARNING(?APPLOG_APPM_062,"Hey: ~s handle_info: Info = ~w\n", [?MODULE, _Info]),
+    ?ELOG_WARNING("Info = ~w", [_Info]),
     {noreply, State}.
 
 %%--------------------------------------------------------------------

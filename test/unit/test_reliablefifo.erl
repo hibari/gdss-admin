@@ -20,12 +20,6 @@
 -include("brick_public.hrl").
 -include("gmt_hlog.hrl").
 
--ifdef(debug_brick_test0).
--define(gmt_debug, true).
--endif.
-%%-define(gmt_debug, true).                     %QQQXXXYYYZZZ debugging
--include("gmt_debug.hrl").
-
 -define(M, brick_server).
 
 -define(HEAD, reliablefifo___ch1_b1).
@@ -168,8 +162,6 @@ chain_reliablefifo(OptionList, Repeat, Start, Stop) ->
     TM2 = receive {ets,Y} -> Y end,
     io:format(":::ets done~n"),
 
-    ?DBG(HM2),
-    ?DBG(TM2),
     case HM2 of
         TM2 ->
             io:format("~n:::GOOD(~p), both bricks are equal(~p keys).\n",

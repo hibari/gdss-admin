@@ -29,8 +29,6 @@
 %% Erlang/OTP application.
 
 -module(brick_admin_sup).
--include("applog.hrl").
-
 
 -behaviour(supervisor).
 

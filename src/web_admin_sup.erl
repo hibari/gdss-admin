@@ -18,8 +18,6 @@
 %%%----------------------------------------------------------------------
 
 -module(web_admin_sup).
--include("applog.hrl").
-
 
 -behaviour(supervisor).
 
@@ -56,8 +54,7 @@ start_link(_Args) ->
 init(_Args) ->
     %% Child_spec = [Name, {M, F, A},
     %%               Restart, Shutdown_time, Type, Modules_used]
-    {ok, AdminConf} = gmt_config_svr:get_config_value(brick_admin_conf_path,
-                                                      ""),
+    {ok, AdminConf} = application:get_env(gdss_admin, brick_admin_conf_path),
     if AdminConf /= "" ->
             httpd_sup:init([[{httpd, AdminConf}]]);
        true ->

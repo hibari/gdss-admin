@@ -18,8 +18,8 @@
 %%%-------------------------------------------------------------------
 
 -module(brick_admin_event_h).
--include("applog.hrl").
 
+-include("gmt_elog.hrl").
 
 -behaviour(gen_event).
 
@@ -63,7 +63,7 @@ add_handler(HandlerSpec) ->
 %% this function is called to initialize the event handler.
 %%--------------------------------------------------------------------
 init(_Args) ->
-    ?APPLOG_INFO(?APPLOG_APPM_035,"DEBUG: ~p: init: ~p\n", [?MODULE, _Args]),
+    ?ELOG_INFO("init: ~p", [_Args]),
     {ok, #state{}}.
 
 %%--------------------------------------------------------------------
@@ -80,47 +80,43 @@ handle_event({set_alarm, {{alarm_network_heartbeat, {Node, AorB}}, _Descr}}, Sta
     %%       but there is no category for non-brick, non-chain events in
     %%       the scoreboard right now.
     if AorB == 'A' ->
-            ?APPLOG_INFO(?APPLOG_APPM_036,"~s: node ~p heartbeats on 'A' network in "
-                         "alarm, disconnecting from network "
-                         "distribution\n", [?MODULE, Node]),
+            ?ELOG_INFO("node ~p heartbeats on 'A' network in "
+                       "alarm, disconnecting from network "
+                       "distribution", [Node]),
             net_kernel:disconnect(Node);
        AorB == 'B' ->
-            ?APPLOG_INFO(?APPLOG_APPM_037,"~s: node ~p heartbeats on 'B' network are "
-                         "in alarm.", [?MODULE, Node])
+            ?ELOG_INFO("node ~p heartbeats on 'B' network are "
+                       "in alarm.", [Node])
     end,
     {ok, State};
 handle_event({beacon_event, FromAddr, FromPort, B}, State)
   when is_record(B, beacon) ->
     case proplists:get_value(brick_admin, B#beacon.extra) of
         undefined ->
-            %% error_logger:info_msg("DEBUG: ok beacon: ~p\n", [B]),
             ok;
         {Phase, _StartTime, Node, _Pid} ->
             if Node == node() ->
-                    %% error_logger:info_msg("DEBUG: ok admin: ~p\n", [B]),
                     ok;
                Phase == starting ->
-                    ?APPLOG_INFO(?APPLOG_APPM_038,
-                                 "Duplicate Admin Server trying to start: ~p ~p ~p\n",
-                                 [FromAddr, FromPort, B]),
+                    ?ELOG_INFO("Duplicate Admin Server trying to start: ~p ~p ~p",
+                               [FromAddr, FromPort, B]),
                     ok;
                true ->
-                    ?APPLOG_WARNING(?APPLOG_APPM_039,
-                                    "Duplicate Admin Server: ~p ~p ~p\n",
-                                    [FromAddr, FromPort, B]),
+                    ?ELOG_WARNING("Duplicate Admin Server: ~p ~p ~p",
+                                  [FromAddr, FromPort, B]),
                     timer:sleep(1),             % log to flushes to disk?
                     spawn(fun() -> application:stop(gdss),
                                    timer:sleep(200),
                                    erlang:halt() end)
             end;
         _Other ->
-            ?APPLOG_ALERT(?APPLOG_APPM_040,"bad beacon: ~p ~p ~p\n",
-                          [FromAddr, FromPort, B]),
+            ?ELOG_ERROR("bad beacon: ~p ~p ~p",
+                        [FromAddr, FromPort, B]),
             ok
     end,
     {ok, State};
 handle_event(_Event, State) ->
-    ?APPLOG_INFO(?APPLOG_APPM_041,"DEBUG: ~p: handle_event: ~p\n", [?MODULE, _Event]),
+    ?ELOG_INFO("handle_event: ~p", [_Event]),
     {ok, State}.
 
 %%--------------------------------------------------------------------
@@ -133,8 +129,8 @@ handle_event(_Event, State) ->
 %% gen_event:call/3,4, this function is called for the specified event
 %% handler to handle the request.
 %%--------------------------------------------------------------------
-handle_call(Request, State) ->
-    ?APPLOG_INFO(?APPLOG_APPM_042,"~s: handle_call ~p\n", [?MODULE, Request]),
+handle_call(_Request, State) ->
+    ?ELOG_INFO("handle_call: ~p", [_Request]),
     {ok, unknown_call, State}.
 
 %%--------------------------------------------------------------------
@@ -146,8 +142,8 @@ handle_call(Request, State) ->
 %% an event manager receives any other message than an event or a synchronous
 %% request (or a system message).
 %%--------------------------------------------------------------------
-handle_info(Info, State) ->
-    ?APPLOG_INFO(?APPLOG_APPM_043,"~s: handle_info ~p\n", [?MODULE, Info]),
+handle_info(_Info, State) ->
+    ?ELOG_INFO("handle_info: ~p", [_Info]),
     {ok, State}.
 
 %%--------------------------------------------------------------------

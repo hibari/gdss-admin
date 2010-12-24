@@ -41,13 +41,9 @@
 %% the "score board" module.
 
 -module(brick_squorum).
--include("applog.hrl").
 
+-include("gmt_elog.hrl").
 
--ifdef(debug_squorum).
--define(gmt_debug, true).
--endif.
--include("gmt_debug.hrl").
 -include("brick_specs.hrl").
 
 -define(FOO_TIMEOUT, 15*1000).
@@ -253,15 +249,16 @@ strict_quorum_answer_set(MultiCallRes, Servers, _Op) ->
             if length(NonConformingBricks) == length(Servers) ->
                     failed;
                true ->
-                    ?APPLOG_INFO(?APPLOG_APPM_067,"quorum_error: Op = ~P\nNonConformingBricks = ~p\nServers = ~p\n", [_Op, 20, NonConformingBricks, Servers]),
+                    ?ELOG_INFO("quorum_error: Op = ~P\nNonConformingBricks = ~p\nServers = ~p",
+                               [_Op, 20, NonConformingBricks, Servers]),
                     quorum_error
             end;
        Count >= MinQuorum ->
             Answer;
        true ->
-            ?APPLOG_INFO(?APPLOG_APPM_068,"quorum_error: Op = ~P\n"
-                         "true/default clause A: ~p ~p ~p ~p\n",
-                         [_Op, 20, Count, MinQuorum, Rs, BadNodes]),
+            ?ELOG_INFO("quorum_error: Op = ~P\n"
+                       "true/default clause A: ~p ~p ~p ~p",
+                       [_Op, 20, Count, MinQuorum, Rs, BadNodes]),
             quorum_error
     end.
 
@@ -288,18 +285,18 @@ strict_quorum_answer_delete(MultiCallRes, Servers, Op) ->
                     %% popular answer is still OK.
                     Answer;
                 _X ->
-                    ?APPLOG_ALERT(?APPLOG_APPM_069,"WHA? Op = ~p\n", [Op]),
-                    ?APPLOG_ALERT(?APPLOG_APPM_070,"WHA? Rs = ~p\n", [Rs]),
-                    ?APPLOG_ALERT(?APPLOG_APPM_071,"WHA? NonConformingBricks = ~p\n", [NonConformingBricks]),
-                    ?APPLOG_ALERT(?APPLOG_APPM_072,"WHA? _X = ~p\n", [_X]),
+                    ?ELOG_ERROR("WHA? Op = ~p", [Op]),
+                    ?ELOG_ERROR("WHA? Rs = ~p", [Rs]),
+                    ?ELOG_ERROR("WHA? NonConformingBricks = ~p", [NonConformingBricks]),
+                    ?ELOG_ERROR("WHA? _X = ~p", [_X]),
                     foo_error
             end;
        Count >= MinQuorum ->
             Answer;
        true ->
-            ?APPLOG_INFO(?APPLOG_APPM_073,"quorum_error: Op = ~P\n"
-                         "true/default clause B: ~p ~p ~p ~p\n",
-                         [Op, 20, Count, MinQuorum, Rs, BadNodes]),
+            ?ELOG_INFO("quorum_error: Op = ~P\n"
+                       "true/default clause B: ~p ~p ~p ~p",
+                       [Op, 20, Count, MinQuorum, Rs, BadNodes]),
             quorum_error
     end.
 
@@ -367,17 +364,17 @@ strict_quorum_answer_get(MultiCallRes, Servers, Op) ->
                     %% Don't throw an error here: we may have had something
                     %% happen like catching a brick that's in state or role
                     %% transition.
-                    ?APPLOG_INFO(?APPLOG_APPM_074,"quorum get.3: ~p: ~p\n",
-                                 [BadBrick, Res]),
+                    ?ELOG_INFO("quorum get.3: ~p: ~p",
+                               [BadBrick, Res]),
                     timer:sleep(250)
             end,
             re_submit;
        Count >= MinQuorum ->
             Answer;
        true ->
-            ?APPLOG_INFO(?APPLOG_APPM_075,"quorum_error: Op = ~P\n"
-                         "true/default clause C: ~p ~p ~p ~p\n",
-                         [Op, 20, Count, MinQuorum, Rs, BadNodes]),
+            ?ELOG_INFO("quorum_error: Op = ~P\n"
+                       "true/default clause C: ~p ~p ~p ~p",
+                       [Op, 20, Count, MinQuorum, Rs, BadNodes]),
             quorum_error
     end.
 

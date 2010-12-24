@@ -18,8 +18,6 @@
 %%%----------------------------------------------------------------------
 
 -module(brick_admin_cinfo).
--include("applog.hrl").
-
 
 -include("brick_admin.hrl").
 
@@ -58,8 +56,7 @@ admin_server_status(C) ->
     cluster_info:format(C, " My node: ~p\n", [node()]),
     cluster_info:format(C, " Admin Server node: ~p\n",
                         [catch node(global:whereis_name(brick_admin))]),
-    {ok, Nodes} =
-        gmt_config_svr:get_config_value(admin_server_distributed_nodes, ""),
+    {ok, Nodes} = application:get_env(gdss_admin, admin_server_distributed_nodes),
     cluster_info:format(C, " Admin Server eligible nodes: ~p\n", [Nodes]).
 
 admin_status_top(C) ->
