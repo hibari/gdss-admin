@@ -144,7 +144,7 @@ single_brick_regression2(OptionList) ->
     %% Do the same while in the middle of a checkpoint.
     %% Fseveral() should still work correctly.
     brick_server:checkpoint(?TEST_NAME, node(),
-                                [{start_sleep_time, 1000}]),
+                            [{start_sleep_time, 1000}]),
     timer:sleep(200),
     ok = Fseveral(),
 
@@ -193,8 +193,8 @@ t1(BrickName, Node) ->
     %% Test basic add, replace, set
 
     ok = ?M:set(BrickName, Node, "foo", "foo2"),
-    %S1 = ?M:dump_state(Node),
-    %io:format("State 1 = ~w\n", [S1]),
+    %%S1 = ?M:dump_state(Node),
+    %%io:format("State 1 = ~w\n", [S1]),
     {key_exists, _} = ?M:add(BrickName, Node, "foo", "foo2"),
 
     key_not_exist = ?M:replace(BrickName, Node, "notexist", "foo2"),
@@ -230,13 +230,13 @@ t1(BrickName, Node) ->
     %% using TS3 again for the new timestamp, and the new & different
     %% value should trigger ts_error.
     [{ts_error, TS3}] = ?M:do(BrickName, Node,
-                            [?M:make_op6(set, "baz", TS3, <<"baz5">>, 0,
-                                         [{testset, TS3}])]),
+                              [?M:make_op6(set, "baz", TS3, <<"baz5">>, 0,
+                                           [{testset, TS3}])]),
     %% Same thing, but using the same timestamp and same value as currently
     %% stored by the brick, should succeed.
     [ok] = ?M:do(BrickName, Node,
-                            [?M:make_op6(set, "baz", TS3, <<"baz3">>, 0,
-                                         [{testset, TS3}])]),
+                 [?M:make_op6(set, "baz", TS3, <<"baz3">>, 0,
+                              [{testset, TS3}])]),
 
     %% Basic delete
     ok = ?M:add(BrickName, Node, "delme", "delme1"),
@@ -253,22 +253,22 @@ t1(BrickName, Node) ->
     %% Basic multiple queries
     [ok, ok, {key_exists, _}] =
         ?M:do(BrickName, Node, [?M:make_add("m-a1a", "m-a1a-v"),
-                    ?M:make_add("m-a1b", "m-a1b-v"),
-                    ?M:make_add("foo", "foo66")]),
+                                ?M:make_add("m-a1b", "m-a1b-v"),
+                                ?M:make_add("foo", "foo66")]),
     io:format("NOTE: mult query tests are incomplete!\n"),
 
     %% Basic txn
     {txn_fail, [{3, {key_exists, _}}]} =
         ?M:do(BrickName, Node, [?M:make_txn(),
-                    ?M:make_add("m-a1c", "m-a1c-v"),
-                    ?M:make_add("m-a1d", "m-a1d-v"),
-                    ?M:make_add("foo", "foo66")]),
+                                ?M:make_add("m-a1c", "m-a1c-v"),
+                                ?M:make_add("m-a1d", "m-a1d-v"),
+                                ?M:make_add("foo", "foo66")]),
     [ok, ok, {ok, _, _}, ok]  =
         ?M:do(BrickName, Node, [?M:make_txn(),
-                    ?M:make_add("m-a1c", "m-a1c-v"),
-                    ?M:make_add("m-a1d", "m-a1d-v"),
-                    ?M:make_get("foo"),
-                    ?M:make_replace("foo", "foo67")]),
+                                ?M:make_add("m-a1c", "m-a1c-v"),
+                                ?M:make_add("m-a1d", "m-a1d-v"),
+                                ?M:make_get("foo"),
+                                ?M:make_replace("foo", "foo67")]),
     io:format("NOTE: txn tests are incomplete!\n"),
 
     %% Test the timestamp checking on the server: add a key, then
@@ -303,14 +303,14 @@ t1(BrickName, Node) ->
     RunIters = 10*1000,
     io:format("Running tight async set+get loop for ~w iterations\n", [RunIters]),
     OldSyncVal = brick_server:set_do_sync(BrickName, false),
-    [ok = begin
-              Val = list_to_binary("val"++integer_to_list(X)),
-              brick_server:set(BrickName, Node, "foo", Val),
-              {Val, {ok, _, Val}} = {Val, brick_server:get(BrickName, Node, "foo")},
-              ok = brick_server:delete(BrickName, Node, "foo"),
-              key_not_exist = brick_server:delete(BrickName, Node, "foo"),
-              ok
-          end || X <- lists:seq(1, RunIters)],
+    [begin
+         Val = list_to_binary("val"++integer_to_list(X)),
+         brick_server:set(BrickName, Node, "foo", Val),
+         {Val, {ok, _, Val}} = {Val, brick_server:get(BrickName, Node, "foo")},
+         ok = brick_server:delete(BrickName, Node, "foo"),
+         key_not_exist = brick_server:delete(BrickName, Node, "foo"),
+         ok
+     end || X <- lists:seq(1, RunIters)],
     brick_server:set_do_sync(BrickName, OldSyncVal),
 
     io:format("Test t1: end\n"),
@@ -329,7 +329,7 @@ t2(BrickName, Node) ->
     %% Do the same while in the middle of a checkpoint.
     %% Fseveral() should still work correctly.
     brick_server:checkpoint(BrickName, Node,
-                                [{start_sleep_time, 1000}]),
+                            [{start_sleep_time, 1000}]),
     timer:sleep(200),
     {ok, {ManyRes2, false}} = ?M:get_many(BrickName, Node, ?BRICK__GET_MANY_FIRST, 1111),
     ManyRes2 = ManyRes1,
@@ -438,8 +438,8 @@ t3(BrickName, Node) ->
     %% Now that checkpoint is done, verify key list is the same as Res5.
     {ok, {ManyRes6, false}} = ?M:get_many(BrickName, Node, ?BRICK__GET_MANY_FIRST, 1111),
     ManyRes6Keys = [Key || {Key, _, _, _, _} <- ManyRes6],
-io:format("ManyRes5Keys = ~p\n", [ManyRes5Keys]),
-io:format("ManyRes6Keys = ~p\n", [ManyRes6Keys]),
+    io:format("ManyRes5Keys = ~p\n", [ManyRes5Keys]),
+    io:format("ManyRes6Keys = ~p\n", [ManyRes6Keys]),
     ManyRes6Keys = ManyRes5Keys,
 
     %% Delete all entries again, populate a few from scratch, checkpoint.
@@ -474,9 +474,9 @@ t4(BrickName, Node) ->
     io:format("Test t4: start\n"),
     %% Test the binary_prefix option.
 
-%     io:format("Wait until prior tests' checkpoint(s) stuff is done..."),
-%     wait_for_checkpoint_to_finish(BrickName, Node),
-%     io:format(" DONE\n"),
+    %%     io:format("Wait until prior tests' checkpoint(s) stuff is done..."),
+    %%     wait_for_checkpoint_to_finish(BrickName, Node),
+    %%     io:format(" DONE\n"),
 
     P0 = [{binary_prefix, <<"0">>}],
     P1 = [{binary_prefix, <<"1">>}],
@@ -727,26 +727,26 @@ t50(BrickName, Node, NumIters, DoSet) ->
     {T3, _R3} = timer:tc(?MODULE, loopN, [NumIters, Wit1]),
     io:format("done in ~w secs (~w op/sec)\n", [T3 / 1000000, round(NumIters / (T3 / 1000000))]),
 
-%%     Fun1 = fun(Node) ->
-%%                 io:format("Intentionally update only the server ~w\n", [Node]),
-%%                 Val4B = list_to_binary("foo" ++ atom_to_list(Node)),
-%%                 F1 = fun(N) ->
-%%                              K = lists:flatten(io_lib:format("t50-Fun1-~w-~w", [node(), N])),
-%%                              [ok] = ?M:set([Node], BrickName, K, Val4B)
-%%                      end,
-%%                 {T1a, _R} = timer:tc(?MODULE, loopN, [NumIters, F1]),
-%%                 io:format("done in ~w secs (~w op/sec)\n", [T1a / 1000000, NumIters / (T1a / 1000000)]),
-%%                 %%
-%%                 io:format("Use multi_get to 'scan' the ~w items and fix them\n", [NumIters]),
-%%                 F2 = fun(N) ->
-%%                              K = lists:flatten(io_lib:format("t50-Fun1-~w-~w", [node(), N])),
-%%                              %% This soon-to-go-away func does not return list
-%%                              {ok, _, Val4B} = ?M:multi_get(BrickName, Node, K, [])
-%%                      end,
-%%                 {T2a, _R} = timer:tc(?MODULE, loopN, [NumIters, F2]),
-%%                 io:format("done in ~w secs (~w op/sec)\n", [T2a / 1000000, NumIters / (T2a / 1000000)])
-%%         end,
-%%     lists:map(Fun1, Node),
+    %%     Fun1 = fun(Node) ->
+    %%                 io:format("Intentionally update only the server ~w\n", [Node]),
+    %%                 Val4B = list_to_binary("foo" ++ atom_to_list(Node)),
+    %%                 F1 = fun(N) ->
+    %%                              K = lists:flatten(io_lib:format("t50-Fun1-~w-~w", [node(), N])),
+    %%                              [ok] = ?M:set([Node], BrickName, K, Val4B)
+    %%                      end,
+    %%                 {T1a, _R} = timer:tc(?MODULE, loopN, [NumIters, F1]),
+    %%                 io:format("done in ~w secs (~w op/sec)\n", [T1a / 1000000, NumIters / (T1a / 1000000)]),
+    %%                 %%
+    %%                 io:format("Use multi_get to 'scan' the ~w items and fix them\n", [NumIters]),
+    %%                 F2 = fun(N) ->
+    %%                              K = lists:flatten(io_lib:format("t50-Fun1-~w-~w", [node(), N])),
+    %%                              %% This soon-to-go-away func does not return list
+    %%                              {ok, _, Val4B} = ?M:multi_get(BrickName, Node, K, [])
+    %%                      end,
+    %%                 {T2a, _R} = timer:tc(?MODULE, loopN, [NumIters, F2]),
+    %%                 io:format("done in ~w secs (~w op/sec)\n", [T2a / 1000000, NumIters / (T2a / 1000000)])
+    %%         end,
+    %%     lists:map(Fun1, Node),
 
     io:format("Test t50: end\n"),
     ok.
@@ -807,67 +807,67 @@ t51(BrickName, Node, NumProcs, PhaseTime, DoSet) ->
     WitCount = collect_counts(WitPids),
     io:format(" ~w ops, ~w ops/sec\n", [WitCount, round(WitCount / PhaseTime)]),
 
-%     Wit1 = fun(N, ProcNum) ->
-%                  %% QQQ Kludge: all threads will get the same 10 records.
-%                  K = lists:flatten(io_lib:format("t50-Fun1-~w-~w", [ProcNum, N rem 10])),
-%                  [{ok, _}] = ?M:get(BrickName, Node, K, [witness])
-%          end,
-%     io:format("Starting ~w procs of Wit1 for ~w secs ... ",
-%             [NumProcs, PhaseTime]),
-%     WitPids = [spawn(fun() -> loop_msg_stop(Wit1, PN) end) ||
-%                 PN <- lists:seq(1, NumProcs)],
-%     timer:sleep(PhaseTime * 1000),
-%     WitCount = collect_counts(WitPids),
-%     io:format(" ~w ops, ~w ops/sec\n", [WitCount, WitCount / PhaseTime]),
+    %%     Wit1 = fun(N, ProcNum) ->
+    %%                  %% QQQ Kludge: all threads will get the same 10 records.
+    %%                  K = lists:flatten(io_lib:format("t50-Fun1-~w-~w", [ProcNum, N rem 10])),
+    %%                  [{ok, _}] = ?M:get(BrickName, Node, K, [witness])
+    %%          end,
+    %%     io:format("Starting ~w procs of Wit1 for ~w secs ... ",
+    %%             [NumProcs, PhaseTime]),
+    %%     WitPids = [spawn(fun() -> loop_msg_stop(Wit1, PN) end) ||
+    %%                 PN <- lists:seq(1, NumProcs)],
+    %%     timer:sleep(PhaseTime * 1000),
+    %%     WitCount = collect_counts(WitPids),
+    %%     io:format(" ~w ops, ~w ops/sec\n", [WitCount, WitCount / PhaseTime]),
 
-%     [{ok, KeyList0, _}] = ?M:get_many([hd(Node)], ?BRICK__GET_MANY_FIRST, 20000, [witness]),
-%     BlastNum = 444,
-%     Keys0 = [K || {K, _TS} <- KeyList0],
-%     ChoppedKeys1 = chop_list(Keys0, BlastNum),
-%     Node1 = hd(Node),
-%     io:format("Intentionally update only the server ~w\n", [Node1]),
-%     Parent = self(),
-%     Fbogus_update =
-%       fun(Keys) ->
-%               [?M:set([Node1], K, Val2K_y) || K <- Keys],
-%               Parent ! {done, self()}
-%       end,
-%     Pids1a = [spawn(fun() -> Fbogus_update(Keys) end) || Keys <- ChoppedKeys1],
-%     lists:foreach(fun(Pid) -> receive {done, Pid} -> ok end end, Pids1a),
+    %%     [{ok, KeyList0, _}] = ?M:get_many([hd(Node)], ?BRICK__GET_MANY_FIRST, 20000, [witness]),
+    %%     BlastNum = 444,
+    %%     Keys0 = [K || {K, _TS} <- KeyList0],
+    %%     ChoppedKeys1 = chop_list(Keys0, BlastNum),
+    %%     Node1 = hd(Node),
+    %%     io:format("Intentionally update only the server ~w\n", [Node1]),
+    %%     Parent = self(),
+    %%     Fbogus_update =
+    %%       fun(Keys) ->
+    %%               [?M:set([Node1], K, Val2K_y) || K <- Keys],
+    %%               Parent ! {done, self()}
+    %%       end,
+    %%     Pids1a = [spawn(fun() -> Fbogus_update(Keys) end) || Keys <- ChoppedKeys1],
+    %%     lists:foreach(fun(Pid) -> receive {done, Pid} -> ok end end, Pids1a),
 
-%     io:format("Repair via multi_get ... "),
-%     Fmulti_get_repair =
-%       fun(Keys) ->
-%               %%[{io:format("multi get(~s)\n", [K]), {ok, _, Val2K_y} = ?M:multi_get(BrickName, Node, K, [])} || K <- Keys],
-%               [[{ok, _, Val2K_y}] = ?M:multi_get(BrickName, Node, K, []) || K <- Keys],
-%               Parent ! {done, self()}
-%       end,
-%     Start1b = now(),
-%     Pids1b = [spawn(fun() -> Fmulti_get_repair(Keys) end) || Keys <- ChoppedKeys1],
-%     lists:foreach(fun(Pid) -> receive {done, Pid} -> ok end end, Pids1b),
-%     Stop1b = now(),
-%     DiffSec = timer:now_diff(Stop1b, Start1b) / (1000*1000),
-%     io:format("done in ~w sec, ~w ops/sec\n", [DiffSec, length(Keys0) / DiffSec]),
+    %%     io:format("Repair via multi_get ... "),
+    %%     Fmulti_get_repair =
+    %%       fun(Keys) ->
+    %%               %%[{io:format("multi get(~s)\n", [K]), {ok, _, Val2K_y} = ?M:multi_get(BrickName, Node, K, [])} || K <- Keys],
+    %%               [[{ok, _, Val2K_y}] = ?M:multi_get(BrickName, Node, K, []) || K <- Keys],
+    %%               Parent ! {done, self()}
+    %%       end,
+    %%     Start1b = now(),
+    %%     Pids1b = [spawn(fun() -> Fmulti_get_repair(Keys) end) || Keys <- ChoppedKeys1],
+    %%     lists:foreach(fun(Pid) -> receive {done, Pid} -> ok end end, Pids1b),
+    %%     Stop1b = now(),
+    %%     DiffSec = timer:now_diff(Stop1b, Start1b) / (1000*1000),
+    %%     io:format("done in ~w sec, ~w ops/sec\n", [DiffSec, length(Keys0) / DiffSec]),
 
-%     Fun1 = fun(Node) ->
-%                  io:format("Intentionally update only the server ~w\n", [Node]),
-%                  Val4B = list_to_binary("foo" ++ atom_to_list(Node)),
-%                  F1 = fun(N) ->
-%                               K = lists:flatten(io_lib:format("t50-Fun1-~w-~w", [node(), N])),
-%                               [ok] = ?M:set([Node], K, Val4B)
-%                       end,
-%                  {T1a, _R} = timer:tc(?MODULE, loopN, [Num, F1]),
-%                  io:format("done in ~w secs (~w op/sec)\n", [T1a / 1000000, Num / (T1a / 1000000)]),
-%                  %%
-%                  io:format("Use multi_get to 'scan' the ~w items and fix them\n", [Num]),
-%                  F2 = fun(N) ->
-%                               K = lists:flatten(io_lib:format("t50-Fun1-~w-~w", [node(), N])),
-%                               [{ok, _, Val4B}] = ?M:multi_get(BrickName, Node, K, [])
-%                       end,
-%                  {T2a, _R} = timer:tc(?MODULE, loopN, [Num, F2]),
-%                  io:format("done in ~w secs (~w op/sec)\n", [T2a / 1000000, Num / (T2a / 1000000)])
-%          end,
-%     lists:map(Fun1, Node),
+    %%     Fun1 = fun(Node) ->
+    %%                  io:format("Intentionally update only the server ~w\n", [Node]),
+    %%                  Val4B = list_to_binary("foo" ++ atom_to_list(Node)),
+    %%                  F1 = fun(N) ->
+    %%                               K = lists:flatten(io_lib:format("t50-Fun1-~w-~w", [node(), N])),
+    %%                               [ok] = ?M:set([Node], K, Val4B)
+    %%                       end,
+    %%                  {T1a, _R} = timer:tc(?MODULE, loopN, [Num, F1]),
+    %%                  io:format("done in ~w secs (~w op/sec)\n", [T1a / 1000000, Num / (T1a / 1000000)]),
+    %%                  %%
+    %%                  io:format("Use multi_get to 'scan' the ~w items and fix them\n", [Num]),
+    %%                  F2 = fun(N) ->
+    %%                               K = lists:flatten(io_lib:format("t50-Fun1-~w-~w", [node(), N])),
+    %%                               [{ok, _, Val4B}] = ?M:multi_get(BrickName, Node, K, [])
+    %%                       end,
+    %%                  {T2a, _R} = timer:tc(?MODULE, loopN, [Num, F2]),
+    %%                  io:format("done in ~w secs (~w op/sec)\n", [T2a / 1000000, Num / (T2a / 1000000)])
+    %%          end,
+    %%     lists:map(Fun1, Node),
 
     io:format("Test t50: end\n"),
     ok.
@@ -890,7 +890,7 @@ t60_get(Nodes, BrickName, RS = Summary) ->
     TS1 = 100,
     TS2 = 200,
 
-    %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
     %% Perfect case: All bricks are available.
     %% Check all combinations of servers "damaged" via delete or replace.
     %% Check all combinations of witness or not.
@@ -960,7 +960,7 @@ t60_get(Nodes, BrickName, RS = Summary) ->
                                             F  <- WitnessVariations],
     _R = lists:map(Fdel_combinations, Damage_plus_Flags_Vars),
 
-    %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
     %% Not-so-perfect case: Some bricks available.
     %% Check all combinations of servers down (not "damaged" as previous test).
     %% Check all combinations of witness or not.
@@ -1021,7 +1021,7 @@ t60_get_longer(Nodes, BrickName, RS = _Summary) ->
     Put_a = ?M:make_op6(set, Key1, TS1, Val1, 0, []),
     [[ok] = ?M:do(BrickName, Node, [Put_a]) || Node <- Nodes],
 
-    %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
     %% Loop: While one proc attempts repeated get ops, another proc
     %%       (the "meddler") will delete one copy of the key.
     MeddleTarget = lists:last(Nodes),
@@ -1052,11 +1052,11 @@ t60_get_longer(Nodes, BrickName, RS = _Summary) ->
                         DelCount = receive {ok, Meddler, Dels} -> Dels end,
                         %% One last get to repair Key1, if necessary.
                         [{ok, _TS, Val1}] = ?M:get(Nodes, BrickName,
-                                                     Key1, RS),
+                                                   Key1, RS),
                         {false, {DelCount, Count}};
                     _ ->
                         [{ok, _TS, Val1}] = ?M:get(Nodes, BrickName,
-                                                     Key1, RS),
+                                                   Key1, RS),
                         {true, {StartTime, Meddler, Count+1}}
                 end
         end,
@@ -1066,7 +1066,7 @@ t60_get_longer(Nodes, BrickName, RS = _Summary) ->
     io:format("t60_get_longer: 1: read count   = ~w\n", [ReadCount1]),
     timer:sleep(1000),
 
-    %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
     %% Loop: While one proc attempts repeated get ops, another proc
     %%       (the "meddler") will delete one copy of the key and replace
     %%       the key with an older TS value.  Each get op should return
@@ -1166,8 +1166,8 @@ t90(BrickName0, Node, OptionList, DoCheckpointP) ->
                     ok
             end,
     Fset = fun() ->
-                 [ok = ?M:set(BrickName, Node, K, V) ||
-                     {K, V} <- [{"k1", "v1"}, {"k2", "v2"}, {<<"k3">>, <<"v3">>}]]
+                   [ok = ?M:set(BrickName, Node, K, V) ||
+                       {K, V} <- [{"k1", "v1"}, {"k2", "v2"}, {<<"k3">>, <<"v3">>}]]
            end,
 
     K1 = <<"$$$_t90_key1">>,
@@ -1201,11 +1201,11 @@ t90(BrickName0, Node, OptionList, DoCheckpointP) ->
     end,
 
     ok = Fstop(),
-%     io:format("\n\n\nDBG: TEST0 DUMP of hlog.~p\n\n\n", [BrickName]),
-%     brick_ets:debug_scan("hlog.regression_test0_t90"),
+    %%     io:format("\n\n\nDBG: TEST0 DUMP of hlog.~p\n\n\n", [BrickName]),
+    %%     brick_ets:debug_scan("hlog.regression_test0_t90"),
     start_and_flush_common_log(),
-%     io:format("\n\n\nDBG: TEST0 DUMP, after flush, of hlog.~p\n\n\n", [BrickName]),
-%     brick_ets:debug_scan("hlog.regression_test0_t90"),
+    %%     io:format("\n\n\nDBG: TEST0 DUMP, after flush, of hlog.~p\n\n\n", [BrickName]),
+    %%     brick_ets:debug_scan("hlog.regression_test0_t90"),
     ok = Fstart(),
 
     %% Check a fix for checkpoint + bigdata_dir bug: values are
@@ -1306,13 +1306,13 @@ loopNverbose(N, Fun) ->
 loopN2(0, _Fun, _Verbose) ->
     ok;
 loopN2(N, Fun, Verbose) ->
-    %io:format("QQQ: 1\n"),
+                                                %io:format("QQQ: 1\n"),
     Fun(N),
-    %io:format("QQQ: 2\n"),
+                                                %io:format("QQQ: 2\n"),
     if Verbose, N rem 1000 == 0 -> io:format("Progress: N = ~w\n", [N]);
        true -> ok
     end,
-    %io:format("QQQ: 3\n"),
+                                                %io:format("QQQ: 3\n"),
     loopN2(N - 1, Fun, Verbose).
 
 loop_msg_stop(Fun, Extra) ->
@@ -1533,7 +1533,7 @@ chain_t20(OptionList) ->
     ChainList = [{chain1, [{Ch1Head, Node}, {Ch1Tail, Node}]}],
     LH = brick_hash:naive_init(ChainList),
     GH = brick_hash:init_global_hash_state(
-            false, unused, 1, LH, ChainList, LH, ChainList),
+           false, unused, 1, LH, ChainList, LH, ChainList),
 
     %% There's only 1 chain, so we can predict exactly which brick will
     %% be used for write vs. read.
@@ -1663,7 +1663,7 @@ chain_t25(OptionList) ->
                   [{Ch1Head, Node}, {Ch1Middle, Node}, {Ch1Tail, Node}]}],
     LH = brick_hash:naive_init(ChainList),
     GH = brick_hash:init_global_hash_state(
-            false, unused, 1, LH, ChainList, LH, ChainList),
+           false, unused, 1, LH, ChainList, LH, ChainList),
     ok = ?M:chain_hack_set_global_hash(Ch1Head, Node, GH),
     ok = ?M:chain_hack_set_global_hash(Ch1Middle, Node, GH),
     ok = ?M:chain_hack_set_global_hash(Ch1Tail, Node, GH),
@@ -1738,7 +1738,7 @@ chain_t25(OptionList) ->
     ok = ?M:chain_set_ds_repair_state(Ch1Middle, Node, pre_init),
     ok = ?M:chain_role_middle(Ch1Middle, Node, Ch1Head, Node, Ch1Tail, Node,
                               [{official_tail, true}]),
-    % Sanity
+    %% Sanity
     [{ok, _, <<"five">>}] = ?M:do(Ch1Head, Node, Do_get_foo5, [ignore_role], 5*1000),
     [{ok, _, <<"five">>}] = ?M:do(Ch1Middle, Node, Do_get_foo5, [ignore_role], 5*1000),
     [{error,current_repair_state,pre_init}] =
@@ -1801,14 +1801,14 @@ chain_t25(OptionList) ->
     %% Uncomment for additional sanity hand-holding, if needed, but will
     %% only be helpful if gmt_debug = true over on the server side is
     %% also true.
-%%     io:format("\n\n\n"),
-%%     io:format("-------- Sending get to head:\n"),
-%%     {ok, _, "five"} = ?M:get(Ch1Head, Node, "foo5"),
-%%     io:format("-------- Sending get to middle:\n"),
-%%     {ok, _, "five"} = ?M:get(Ch1Middle, Node, "foo5"),
-%%     io:format("-------- Sending get to tail:\n"),
-%%     {ok, _, "five"} = ?M:get(Ch1Tail, Node, "foo5"),
-%%     io:format("\n\n\n"),
+    %%     io:format("\n\n\n"),
+    %%     io:format("-------- Sending get to head:\n"),
+    %%     {ok, _, "five"} = ?M:get(Ch1Head, Node, "foo5"),
+    %%     io:format("-------- Sending get to middle:\n"),
+    %%     {ok, _, "five"} = ?M:get(Ch1Middle, Node, "foo5"),
+    %%     io:format("-------- Sending get to tail:\n"),
+    %%     {ok, _, "five"} = ?M:get(Ch1Tail, Node, "foo5"),
+    %%     io:format("\n\n\n"),
 
     ?M:stop(whereis(Ch1Head)),
     ?M:stop(whereis(Ch1Middle)),
@@ -1839,14 +1839,14 @@ chain_t30(OptionList) ->
     LH3 = brick_hash:naive_init(ChainGrp3),
     _LHs = [LH1, LH2, LH3],
     GH1 = brick_hash:init_global_hash_state(false, unused, 1,
-                                                LH1, ChainGrp1,
-                                                LH1, ChainGrp1),
+                                            LH1, ChainGrp1,
+                                            LH1, ChainGrp1),
     GH2 = brick_hash:init_global_hash_state(false, unused, 1,
-                                                LH2, ChainGrp2,
-                                                LH2, ChainGrp2),
+                                            LH2, ChainGrp2,
+                                            LH2, ChainGrp2),
     GH3 = brick_hash:init_global_hash_state(false, unused, 1,
-                                                LH3, ChainGrp3,
-                                                LH3, ChainGrp3),
+                                            LH3, ChainGrp3,
+                                            LH3, ChainGrp3),
     GHs = [GH1, GH2, GH3],
     TestKeys = ["key" ++ integer_to_list(I) || I <- lists:seq(1, 20)],
     KsVs1 = [{list_to_binary(K ++ "_table1"),
@@ -1918,7 +1918,7 @@ chain_t30(OptionList) ->
                                   %% this check.
                                   DoList = [brick_server:make_get(Key,[])],
                                   Ret = brick_server:do(Br, Nd, DoList,
-                                                          [ignore_role], 1000),
+                                                        [ignore_role], 1000),
                                   case lists:member(Brick, ChainBricks) of
                                       true ->
                                           [{ok, _, Val}] = Ret;
@@ -1952,11 +1952,11 @@ chain_t31(OptionList) ->
     LH1 = brick_hash:naive_init(ChainGrp1),
     LH2 = brick_hash:naive_init(ChainGrp2),
     GH1 = brick_hash:init_global_hash_state(false, unused, 1,
-                                                LH1, ChainGrp1,
-                                                LH1, ChainGrp1),
+                                            LH1, ChainGrp1,
+                                            LH1, ChainGrp1),
     GH2 = brick_hash:init_global_hash_state(false, unused, 1,
-                                                LH2, ChainGrp2,
-                                                LH2, ChainGrp2),
+                                            LH2, ChainGrp2,
+                                            LH2, ChainGrp2),
     GHs = [GH1, GH2],
     TestKeys = ["key" ++ integer_to_list(I) || I <- lists:seq(1, 20)],
     KsVs1 = [{list_to_binary(K ++ "_table311"),
@@ -2031,11 +2031,11 @@ chain_t31(OptionList) ->
     LH1b = brick_hash:naive_init(ChainGrp1b),
     LH2b = brick_hash:naive_init(ChainGrp2b),
     GH1b = brick_hash:init_global_hash_state(false, unused, 1,
-                                                 LH1b, ChainGrp1b,
-                                                 LH1b, ChainGrp1b),
+                                             LH1b, ChainGrp1b,
+                                             LH1b, ChainGrp1b),
     GH2b = brick_hash:init_global_hash_state(false, unused, 1,
-                                                 LH2b, ChainGrp2b,
-                                                 LH2b, ChainGrp2b),
+                                             LH2b, ChainGrp2b,
+                                             LH2b, ChainGrp2b),
     GHsb = [GH1b, GH2b],
     Tmp1b = Fzip_chbrndgh(ChainGrps, GHs),
 
@@ -2077,7 +2077,7 @@ chain_t35(OptionList) ->
                           os:cmd("rm -f *e8mP*.LOG"),
                           os:cmd("rm -rf hlog.*" ++ atom_to_list(Brick) ++ "*"),
                           {ok, _HeadPid} = safe_start_link(Brick, OptionList),
-%                         brick_server:set_do_sync({Brick, Node}, false),
+                          %%                         brick_server:set_do_sync({Brick, Node}, false),
                           ok = ?M:chain_role_standalone(Brick, Node),
                           ok = ?M:chain_set_my_repair_state(Brick, Node, ok)
                   end, Bricks),
@@ -2131,9 +2131,8 @@ chain_t35(OptionList) ->
                         {key_not_exist, QSize, MinQuorum, NumFails} =
                             {?SQ:get(Bricks0, K), QSize, MinQuorum, NumFails},
                         %% Should not exist now on *any* of the bricks.
-                        [{key_not_exist, MinQuorum, NumFails} =
-                         {?M:get(Br, Nd, K), MinQuorum, NumFails} ||
-                            {Br, Nd} <- Bricks0],
+                        [key_not_exist = ?M:get(Br, Nd, K)
+                         || {Br, Nd} <- Bricks0],
                         ok = ?SQ:set(Bricks0, K, V),
                         [ok = ?M:delete(Br, Nd, K) || {Br, Nd} <- FailBricks],
                         key_not_exist = ?SQ:delete(Bricks0, K)
@@ -2141,11 +2140,11 @@ chain_t35(OptionList) ->
       end, lists:seq(1, 9, 2) ++ [2]),
 
     [ok = ?SQ:set(Bricks, K, V) || {K, V} <- KsVs],
-%% io:format("XXX: Bricks = ~p\n", [Bricks]),
-%% Me = garn,
-%% register(Me, self()),
-%% io:format("XXX: Waiting for 'go' at Me = ~w\n", [Me]), receive go -> ok end,
-%% unregister(Me),
+    %% io:format("XXX: Bricks = ~p\n", [Bricks]),
+    %% Me = garn,
+    %% register(Me, self()),
+    %% io:format("XXX: Waiting for 'go' at Me = ~w\n", [Me]), receive go -> ok end,
+    %% unregister(Me),
     {ok, [<<"1">>, <<"2">>], true} =
         ?SQ:get_keys(Bricks, ?BRICK__GET_MANY_FIRST, 2),
     {ok, [<<"3">>, <<"4">>, <<"5">>], true} =
@@ -2214,7 +2213,7 @@ chain_t40(OptionList) ->
     MinTime = TimeOut * 1,
     MaxTime = TimeOut * 15,
     Child = spawn(fun() ->
-    ?DBG_GENx({?MODULE,?LINE}),
+                          ?DBG_GENx({?MODULE,?LINE}),
                           Res = (catch ?M:set(BrickName, Node, Key1, Val3,
                                               MaxTime)),
                           DiffMS = timer:now_diff(now(), StartTime1) / 1000,
@@ -2433,8 +2432,8 @@ chain_t50_common2(WhoToKill, ExitAfterKillP, OptionList) ->
            BrickNameToKill, node(), foocookie, ChainNameToKill,
            [{max_keys_per_iter, 5}, {propagation_delay, 50}]),
     X = brick_server:migration_start_sweep(
-           BrickNameToKill, node(), bad_bad_cookie, ChainNameToKill,
-           [{max_keys_per_iter, 5}, {propagation_delay, 50}]),
+          BrickNameToKill, node(), bad_bad_cookie, ChainNameToKill,
+          [{max_keys_per_iter, 5}, {propagation_delay, 50}]),
     true = not (X == ok),
     io:format("\n\nQQQQQQQ ~p: X = ~p\n\n\n", [BrickNameToKill, X]),
 
@@ -2467,7 +2466,7 @@ chain_t50_common2(WhoToKill, ExitAfterKillP, OptionList) ->
              end,
     QQQ1 = lists:foldl(Fitems, 0, AllBricks1),
     QQQ3 = lists:foldl(Fitems, 0, AllBricks3),
-io:format("QQQ1 ~p QQQ3 ~p\n", [QQQ1, QQQ3]),
+    io:format("QQQ1 ~p QQQ3 ~p\n", [QQQ1, QQQ3]),
     0 = lists:foldl(Fitems, 0, AllBricks1),
     NumKeys = lists:foldl(Fitems, 0, AllBricks3),
     io:format("Yes, all keys moved from old to new bricks\n"),
@@ -2506,7 +2505,8 @@ chain_t51_common(WhoToKill, ExitAfterKillP, OptionList) ->
     [catch brick_test0:chain_stop_entire_chain(OneChain) || OneChain <- Chains_1_3],
     [catch brick_test0:chain_stop_entire_chain(OneChain) || OneChain <- Chains_3_3],
     timer:sleep(200),
-    [io:format("\n================================ Whereis ~p -> ~p\n", [X, whereis(X)]) || X <- [test_ch910_head, test_ch910_middle, test_ch910_tail, test_ch920_head]],
+    [io:format("\n================================ Whereis ~p -> ~p\n",
+               [X, whereis(X)]) || X <- [test_ch910_head, test_ch910_middle, test_ch910_tail, test_ch920_head]],
     %% Kludge!
     start_and_flush_common_log(),
     os:cmd("rm *test_ch9??_*LOG"),
@@ -2615,8 +2615,8 @@ chain_t51_common(WhoToKill, ExitAfterKillP, OptionList) ->
     Fset_global_hash(GH_v2b, AllBricks_b),
     %% Restart migration (same cookie!) via hardcoded kludge.
     _ = brick_server:migration_start_sweep(
-           KilledChainHead, node(), foocookie, ChainNameToKill,
-           [{max_keys_per_iter, 5}, {propagation_delay, 50}]),
+          KilledChainHead, node(), foocookie, ChainNameToKill,
+          [{max_keys_per_iter, 5}, {propagation_delay, 50}]),
 
     poll_migration_finished(AllHeadBricks),
     [{ok, _, _} = brick_server:migration_clear_sweep(Br, Nd) ||
@@ -2643,121 +2643,121 @@ chain_t54(_OptionList) ->
     io:format("Test chain_t54: start\n"),
 
     Bad =
-   [
-    %% len=0
-    [],
-    %% len=1
-    %% bad role
-    [#opconf_r{me = a, role = chain_member, off_tail_p = true}],
-    %% bad off_tail
-    [#opconf_r{me = a, role = standalone, off_tail_p = false}],
-    %% NOTE: off_tail is false by default
-    %% bad down
-    [#opconf_r{me = a, role = standalone, downstream = b, off_tail_p = true}],
-    %% bad up
-    [#opconf_r{me = a, role = standalone, upstream = b, off_tail_p = true}],
-    %% len=2
-    %% bad role
-    [#opconf_r{me = a, downstream = b, role = standalone},
-     #opconf_r{me = b, upstream = a, role = chain_member, off_tail_p = true}],
-    %% no official tail
-    [#opconf_r{me = a, downstream = b, role = chain_member},
-     #opconf_r{me = b, upstream = a, role = chain_member}],
-    %% zero official tails
-    [#opconf_r{me = a, downstream = b, role = chain_member},
-     #opconf_r{me = b, upstream = a, role = chain_member}],
-    %% two official tails
-    [#opconf_r{me = a, downstream = b, role = chain_member, off_tail_p = true},
-     #opconf_r{me = b, upstream = a, role = chain_member, off_tail_p = true}],
-    %% a up+down
-    [#opconf_r{me = a, upstream = b, downstream = b, role = chain_member},
-     #opconf_r{me = b, upstream = a, role = chain_member, off_tail_p = true}],
-    %% b down=self
-    [#opconf_r{me = a, downstream = b, role = chain_member},
-     #opconf_r{me = b, upstream = b, role = chain_member, off_tail_p = true}],
-    %% b down=c
-    [#opconf_r{me = a, downstream = b, role = chain_member},
-     #opconf_r{me = b, upstream = c, role = chain_member, off_tail_p = true}],
-    %% len=3
-    %% cycle
-    [#opconf_r{me = a, downstream = b, role = chain_member},
-     #opconf_r{me = b, upstream = a, downstream = c, role = chain_member, off_tail_p = true},
-     #opconf_r{me = c, downstream = a, role = chain_member}],
-    %% c bad up
-    [#opconf_r{me = a, downstream = b, role = chain_member},
-     #opconf_r{me = b, upstream = a, downstream = c, role = chain_member, off_tail_p = true},
-     #opconf_r{me = c, upstream = d, role = chain_member}],
-    %% b bad down
-    [#opconf_r{me = a, downstream = c, role = chain_member},
-     #opconf_r{me = b, upstream = a, downstream = c, role = chain_member},
-     #opconf_r{me = c, upstream = a, role = chain_member, off_tail_p = true}],
-    %% down chain /= up chain
-    [#opconf_r{me = a, downstream = b, role = chain_member},
-     #opconf_r{me = b, upstream = a, downstream = c, role = chain_member},
-     #opconf_r{me = c, upstream = a, role = chain_member, off_tail_p = true}],
-    %% len=4
-    %% down chain a,b,c,d /= rev(up) chain a,c,d,b
-    [#opconf_r{me = a, downstream = b,               role = chain_member},
-     #opconf_r{me = b, downstream = c, upstream = c, role = chain_member},
-     #opconf_r{me = c, downstream = d, upstream = a, role = chain_member},
-     #opconf_r{me = d,                 upstream = b, role = chain_member, off_tail_p = true}],
-    %% off-tail wrong pos
-    [#opconf_r{me = a, downstream = b,               role = chain_member},
-     #opconf_r{me = b, downstream = c, upstream = a, role = chain_member, off_tail_p = true},
-     #opconf_r{me = c, downstream = d, upstream = b, role = chain_member},
-     #opconf_r{me = d,                 upstream = c, role = chain_member}],
-    %% off-tail duplicate
-    [#opconf_r{me = a, downstream = b,               role = chain_member},
-     #opconf_r{me = b, downstream = c, upstream = a, role = chain_member},
-     #opconf_r{me = c, downstream = d, upstream = b, role = chain_member, off_tail_p = true},
-     #opconf_r{me = d,                 upstream = c, role = chain_member, off_tail_p = true}],
-    %% Adding repairing brick interrupted in middle.
-    [#opconf_r{me = a, downstream = b,               role = chain_member},
-     #opconf_r{me = b, downstream = c, upstream = a, role = chain_member},
-     #opconf_r{me = c,                 upstream = b, role = chain_member, off_tail_p = true},
-     #opconf_r{me = d,                 upstream = c, role = chain_member}],
-    %% Disjoint chains #1
-    [#opconf_r{me = a, downstream = b,               role = chain_member},
-     #opconf_r{me = b,                 upstream = a, role = chain_member, off_tail_p = true},
-     #opconf_r{me = c, downstream = d,                role = chain_member},
-     #opconf_r{me = d,                 upstream = c, role = chain_member, off_tail_p = true}],
-    %% Disjoint chains #2
-    [#opconf_r{me = a, downstream = b,               role = chain_member},
-     #opconf_r{me = b, downstream = c, upstream = a, role = chain_member},
-     #opconf_r{me = c,                 upstream = b, role = chain_member, off_tail_p = true},
-     #opconf_r{me = z, role = standalone, off_tail_p = true}],
+        [
+         %% len=0
+         [],
+         %% len=1
+         %% bad role
+         [#opconf_r{me = a, role = chain_member, off_tail_p = true}],
+         %% bad off_tail
+         [#opconf_r{me = a, role = standalone, off_tail_p = false}],
+         %% NOTE: off_tail is false by default
+         %% bad down
+         [#opconf_r{me = a, role = standalone, downstream = b, off_tail_p = true}],
+         %% bad up
+         [#opconf_r{me = a, role = standalone, upstream = b, off_tail_p = true}],
+         %% len=2
+         %% bad role
+         [#opconf_r{me = a, downstream = b, role = standalone},
+          #opconf_r{me = b, upstream = a, role = chain_member, off_tail_p = true}],
+         %% no official tail
+         [#opconf_r{me = a, downstream = b, role = chain_member},
+          #opconf_r{me = b, upstream = a, role = chain_member}],
+         %% zero official tails
+         [#opconf_r{me = a, downstream = b, role = chain_member},
+          #opconf_r{me = b, upstream = a, role = chain_member}],
+         %% two official tails
+         [#opconf_r{me = a, downstream = b, role = chain_member, off_tail_p = true},
+          #opconf_r{me = b, upstream = a, role = chain_member, off_tail_p = true}],
+         %% a up+down
+         [#opconf_r{me = a, upstream = b, downstream = b, role = chain_member},
+          #opconf_r{me = b, upstream = a, role = chain_member, off_tail_p = true}],
+         %% b down=self
+         [#opconf_r{me = a, downstream = b, role = chain_member},
+          #opconf_r{me = b, upstream = b, role = chain_member, off_tail_p = true}],
+         %% b down=c
+         [#opconf_r{me = a, downstream = b, role = chain_member},
+          #opconf_r{me = b, upstream = c, role = chain_member, off_tail_p = true}],
+         %% len=3
+         %% cycle
+         [#opconf_r{me = a, downstream = b, role = chain_member},
+          #opconf_r{me = b, upstream = a, downstream = c, role = chain_member, off_tail_p = true},
+          #opconf_r{me = c, downstream = a, role = chain_member}],
+         %% c bad up
+         [#opconf_r{me = a, downstream = b, role = chain_member},
+          #opconf_r{me = b, upstream = a, downstream = c, role = chain_member, off_tail_p = true},
+          #opconf_r{me = c, upstream = d, role = chain_member}],
+         %% b bad down
+         [#opconf_r{me = a, downstream = c, role = chain_member},
+          #opconf_r{me = b, upstream = a, downstream = c, role = chain_member},
+          #opconf_r{me = c, upstream = a, role = chain_member, off_tail_p = true}],
+         %% down chain /= up chain
+         [#opconf_r{me = a, downstream = b, role = chain_member},
+          #opconf_r{me = b, upstream = a, downstream = c, role = chain_member},
+          #opconf_r{me = c, upstream = a, role = chain_member, off_tail_p = true}],
+         %% len=4
+         %% down chain a,b,c,d /= rev(up) chain a,c,d,b
+         [#opconf_r{me = a, downstream = b,               role = chain_member},
+          #opconf_r{me = b, downstream = c, upstream = c, role = chain_member},
+          #opconf_r{me = c, downstream = d, upstream = a, role = chain_member},
+          #opconf_r{me = d,                 upstream = b, role = chain_member, off_tail_p = true}],
+         %% off-tail wrong pos
+         [#opconf_r{me = a, downstream = b,               role = chain_member},
+          #opconf_r{me = b, downstream = c, upstream = a, role = chain_member, off_tail_p = true},
+          #opconf_r{me = c, downstream = d, upstream = b, role = chain_member},
+          #opconf_r{me = d,                 upstream = c, role = chain_member}],
+         %% off-tail duplicate
+         [#opconf_r{me = a, downstream = b,               role = chain_member},
+          #opconf_r{me = b, downstream = c, upstream = a, role = chain_member},
+          #opconf_r{me = c, downstream = d, upstream = b, role = chain_member, off_tail_p = true},
+          #opconf_r{me = d,                 upstream = c, role = chain_member, off_tail_p = true}],
+         %% Adding repairing brick interrupted in middle.
+         [#opconf_r{me = a, downstream = b,               role = chain_member},
+          #opconf_r{me = b, downstream = c, upstream = a, role = chain_member},
+          #opconf_r{me = c,                 upstream = b, role = chain_member, off_tail_p = true},
+          #opconf_r{me = d,                 upstream = c, role = chain_member}],
+         %% Disjoint chains #1
+         [#opconf_r{me = a, downstream = b,               role = chain_member},
+          #opconf_r{me = b,                 upstream = a, role = chain_member, off_tail_p = true},
+          #opconf_r{me = c, downstream = d,                role = chain_member},
+          #opconf_r{me = d,                 upstream = c, role = chain_member, off_tail_p = true}],
+         %% Disjoint chains #2
+         [#opconf_r{me = a, downstream = b,               role = chain_member},
+          #opconf_r{me = b, downstream = c, upstream = a, role = chain_member},
+          #opconf_r{me = c,                 upstream = b, role = chain_member, off_tail_p = true},
+          #opconf_r{me = z, role = standalone, off_tail_p = true}],
 
-    %% keep me (no trailing comma)
-    []
-   ],
+         %% keep me (no trailing comma)
+         []
+        ],
 
     Good =
-   [
-    [#opconf_r{me = z, role = standalone, off_tail_p = true}],
-    [#opconf_r{me = a, downstream = b, role = chain_member},
-     #opconf_r{me = b, upstream = a, role = chain_member, off_tail_p = true}],
-    [#opconf_r{me = a, downstream = b, role = chain_member, off_tail_p = true},
-     #opconf_r{me = b, upstream = a, role = chain_member}],
-    %% len=3
-    [#opconf_r{me = a, downstream = b,               role = chain_member},
-     #opconf_r{me = b, downstream = c, upstream = a, role = chain_member},
-     #opconf_r{me = c,                 upstream = b, role = chain_member, off_tail_p = true}],
-    [#opconf_r{me = a, downstream = b,               role = chain_member},
-     #opconf_r{me = b, downstream = c, upstream = a, role = chain_member, off_tail_p = true},
-     #opconf_r{me = c,                 upstream = b, role = chain_member}],
-    %% len=4
-    [#opconf_r{me = a, downstream = b,               role = chain_member},
-     #opconf_r{me = b, downstream = c, upstream = a, role = chain_member},
-     #opconf_r{me = c, downstream = d, upstream = b, role = chain_member},
-     #opconf_r{me = d,                 upstream = c, role = chain_member, off_tail_p = true}],
-    [#opconf_r{me = a, downstream = b,               role = chain_member},
-     #opconf_r{me = b, downstream = c, upstream = a, role = chain_member},
-     #opconf_r{me = c, downstream = d, upstream = b, role = chain_member, off_tail_p = true},
-     #opconf_r{me = d,                 upstream = c, role = chain_member}],
+        [
+         [#opconf_r{me = z, role = standalone, off_tail_p = true}],
+         [#opconf_r{me = a, downstream = b, role = chain_member},
+          #opconf_r{me = b, upstream = a, role = chain_member, off_tail_p = true}],
+         [#opconf_r{me = a, downstream = b, role = chain_member, off_tail_p = true},
+          #opconf_r{me = b, upstream = a, role = chain_member}],
+         %% len=3
+         [#opconf_r{me = a, downstream = b,               role = chain_member},
+          #opconf_r{me = b, downstream = c, upstream = a, role = chain_member},
+          #opconf_r{me = c,                 upstream = b, role = chain_member, off_tail_p = true}],
+         [#opconf_r{me = a, downstream = b,               role = chain_member},
+          #opconf_r{me = b, downstream = c, upstream = a, role = chain_member, off_tail_p = true},
+          #opconf_r{me = c,                 upstream = b, role = chain_member}],
+         %% len=4
+         [#opconf_r{me = a, downstream = b,               role = chain_member},
+          #opconf_r{me = b, downstream = c, upstream = a, role = chain_member},
+          #opconf_r{me = c, downstream = d, upstream = b, role = chain_member},
+          #opconf_r{me = d,                 upstream = c, role = chain_member, off_tail_p = true}],
+         [#opconf_r{me = a, downstream = b,               role = chain_member},
+          #opconf_r{me = b, downstream = c, upstream = a, role = chain_member},
+          #opconf_r{me = c, downstream = d, upstream = b, role = chain_member, off_tail_p = true},
+          #opconf_r{me = d,                 upstream = c, role = chain_member}],
 
-    %% keep me (no trailing comma)
-    [#opconf_r{me = z, role = standalone, off_tail_p = true}]
-   ],
+         %% keep me (no trailing comma)
+         [#opconf_r{me = z, role = standalone, off_tail_p = true}]
+        ],
 
     Ftest = fun(TestCase) ->
                     case (catch brick_chainmon:stitch_op_state(TestCase)) of
@@ -2836,8 +2836,8 @@ chain_t55(OptionList) ->
 
     gmt_loop:do_while(
       fun(_) ->
-              %io:format("ZZZ DBG1: Ch1B1 = ~p\n", [ets:tab2list(Ch1B1ets)]),
-              %io:format("ZZZ DBG1: Ch1B2 = ~p\n", [ets:tab2list(Ch1B2ets)]),
+              %%io:format("ZZZ DBG1: Ch1B1 = ~p\n", [ets:tab2list(Ch1B1ets)]),
+              %%io:format("ZZZ DBG1: Ch1B2 = ~p\n", [ets:tab2list(Ch1B2ets)]),
               Ch1_List = xform_ets_dump(Ch1B1, ets:tab2list(Ch1B1ets)),
               Ch2_List = xform_ets_dump(Ch1B2, ets:tab2list(Ch1B2ets)),
               if Ch1_List /= Ch2_List ->
@@ -2850,7 +2850,7 @@ chain_t55(OptionList) ->
       end, x),
 
     true = (xform_ets_dump(Ch1B1, ets:tab2list(Ch1B1ets)) ==
-            xform_ets_dump(Ch1B2, ets:tab2list(Ch1B2ets))),
+                xform_ets_dump(Ch1B2, ets:tab2list(Ch1B2ets))),
     io:format("ETS tables are identical\n"),
 
     %% Ok, time to grow the chain to 3, while updates are happening.
@@ -2880,9 +2880,9 @@ chain_t55(OptionList) ->
     Ch1B1_list = ets:tab2list(Ch1B1ets),
     Ch1B2_list = ets:tab2list(Ch1B2ets),
     Ch1B3_list = ets:tab2list(Ch1B3ets),
-    %io:format("ZZZ DBG2: Ch1B1 = ~p\n", [ets:tab2list(Ch1B1ets)]),
-    %io:format("ZZZ DBG2: Ch1B2 = ~p\n", [ets:tab2list(Ch1B2ets)]),
-    %io:format("ZZZ DBG2: Ch1B3 = ~p\n", [ets:tab2list(Ch1B3ets)]),
+    %%io:format("ZZZ DBG2: Ch1B1 = ~p\n", [ets:tab2list(Ch1B1ets)]),
+    %%io:format("ZZZ DBG2: Ch1B2 = ~p\n", [ets:tab2list(Ch1B2ets)]),
+    %%io:format("ZZZ DBG2: Ch1B3 = ~p\n", [ets:tab2list(Ch1B3ets)]),
     Ch1B1_dump = xform_ets_dump(Ch1B1, Ch1B1_list),
     Ch1B2_dump = xform_ets_dump(Ch1B2, Ch1B2_list),
     Ch1B3_dump = xform_ets_dump(Ch1B3, Ch1B3_list),
@@ -2925,10 +2925,10 @@ chain_t55(OptionList) ->
     io:format("\n\nPid2 ~w is dead\n\n", [Pid2]), timer:sleep(5000),
     _X5 = sync_poll(Ch1B1, node(), 100),
     io:format("sync polls _X5 = ~p\n", [_X5]),
-    %io:format("ZZZ DBG3: Ch1B1 = ~p\n", [ets:tab2list(Ch1B1ets)]),
-    %io:format("ZZZ DBG3: Ch1B2 = ~p\n", [ets:tab2list(Ch1B2ets)]),
+    %%io:format("ZZZ DBG3: Ch1B1 = ~p\n", [ets:tab2list(Ch1B1ets)]),
+    %%io:format("ZZZ DBG3: Ch1B2 = ~p\n", [ets:tab2list(Ch1B2ets)]),
     true = (xform_ets_dump(Ch1B1, ets:tab2list(Ch1B1ets)) ==
-            xform_ets_dump(Ch1B2, ets:tab2list(Ch1B2ets))),
+                xform_ets_dump(Ch1B2, ets:tab2list(Ch1B2ets))),
     io:format("ETS tables are identical\n"),
 
     %% Ok, time to shrink the chain to 1 (no updates)
@@ -2969,7 +2969,7 @@ chain_t56(OptionList) ->
                           ?ELOG_INFO("Test stopping gdss app"),
                           StopRes = (catch ok = reliable_gdss_stop()),
                           ?ELOG_INFO("Test stopping gdss res: ~p",
-                                  [StopRes]),
+                                     [StopRes]),
                           os:cmd("rm *" ++ MyBase ++ "*"),
                           os:cmd("rm -rf hlog.*" ++ MyBase ++ "*"),
                           os:cmd("rm -rf hlog.commonLogServer"),
@@ -2989,7 +2989,7 @@ chain_t56(OptionList) ->
         X <- lists:seq(1, 20)],
 
     ?ELOG_INFO("Kill ~p, wait a little bit, then kill ~p while ~p is still\n"
-            " under repair.", [Ch1B1, Ch1B2, Ch1B1]),
+               " under repair.", [Ch1B1, Ch1B2, Ch1B1]),
     file:write_file("debug_chain_props",
                     term_to_binary([{max_keys_per_iter, 1},
                                     {repair_ack_sleep, 500},
@@ -3041,7 +3041,7 @@ chain_t100() ->
                           ?ELOG_INFO("Test stopping gdss app\n"),
                           StopRes = (catch ok = reliable_gdss_stop()),
                           ?ELOG_INFO("Test stopping gdss res: ~p\n",
-                                                 [StopRes]),
+                                     [StopRes]),
                           os:cmd("rm *" ++ MyBase ++ "*"),
                           os:cmd("rm -rf hlog.*" ++ MyBase ++ "*"),
                           os:cmd("rm -rf hlog.commonLogServer"),
@@ -3061,8 +3061,8 @@ chain_t100() ->
         X <- lists:seq(1, 200)],
 
     ?ELOG_INFO(
-      "Kill ~p, then wait a little bit, then suspend ~p, "
-      "then see what happens\n", [Ch1B2, Ch1B2]),
+       "Kill ~p, then wait a little bit, then suspend ~p, "
+       "then see what happens\n", [Ch1B2, Ch1B2]),
     %% The 5 x 100 x 100 delay factors will have repair take roughly 2 secs.
     file:write_file("debug_chain_props",
                     term_to_binary([{repair_max_keys, 5},
@@ -3126,7 +3126,7 @@ chain_t101() ->
                           ?ELOG_INFO("Test stopping gdss app\n"),
                           StopRes = (catch ok = reliable_gdss_stop()),
                           ?ELOG_INFO("Test stopping gdss res: ~p\n",
-                                                 [StopRes]),
+                                     [StopRes]),
                           os:cmd("rm *" ++ MyBase ++ "*"),
                           os:cmd("rm -rf hlog.*" ++ MyBase ++ "*"),
                           os:cmd("rm -rf hlog.commonLogServer"),
@@ -3211,7 +3211,7 @@ chain_t102() ->
                           ?ELOG_INFO("Test stopping gdss app\n"),
                           StopRes = (catch ok = reliable_gdss_stop()),
                           ?ELOG_INFO("Test stopping gdss res: ~p\n",
-                                                 [StopRes]),
+                                     [StopRes]),
                           os:cmd("rm *" ++ MyBase ++ "*"),
                           os:cmd("rm -rf hlog.*" ++ MyBase ++ "*"),
                           os:cmd("rm -rf hlog.commonLogServer"),
@@ -3268,7 +3268,7 @@ chain_t103() ->
                           ?ELOG_INFO("Test stopping gdss app\n"),
                           StopRes = (catch ok = reliable_gdss_stop()),
                           ?ELOG_INFO("Test stopping gdss res: ~p\n",
-                                                 [StopRes]),
+                                     [StopRes]),
                           os:cmd("rm *" ++ MyBase ++ "*"),
                           os:cmd("rm -rf hlog.*" ++ MyBase ++ "*"),
                           os:cmd("rm -rf hlog.commonLogServer"),
@@ -3296,13 +3296,13 @@ chain_t103() ->
                                 TabOptions ++ TabWeights2 ++ OptionList),
     ?ELOG_WARNING("Starting migration\n"),
     {ok, _MigTime} = brick_admin:start_migration(
-                      Tab, LH2,
-                      [{max_keys_per_iter, 20}, {propagation_delay, 500}]),
+                       Tab, LH2,
+                       [{max_keys_per_iter, 20}, {propagation_delay, 500}]),
     [begin
          timer:sleep(250),
          NNN0 = slurp_all(Tab, <<"/x0/">>, 100),
          NNN = lists:sort(NNN0), % won't return keys in order, it's dumb.
-         %?ELOG_WARNING("SLURP got ~p: ~p - ~p\n", [length(NNN0), element(1,hd(NNN)), element(1,lists:last(NNN))]),
+         %%?ELOG_WARNING("SLURP got ~p: ~p - ~p\n", [length(NNN0), element(1,hd(NNN)), element(1,lists:last(NNN))]),
          %% Here's the main sanity check: correct length?
          NumKeysPerY = length(NNN)
      end || _ <- lists:seq(1, 30)],
@@ -3450,7 +3450,7 @@ chain_t61(OptionList) ->
                           rpc:call(Node, brick_server, stop, [N]),
                           catch exit(whereis(N), byebye),
                           FilesH = filelib:wildcard("*." ++ atom_to_list(N) ++
-                                                    ",*.LOG", "."),
+                                                        ",*.LOG", "."),
                           [file:delete(F) || F <- FilesH],
                           start_and_flush_common_log(),
                           os:cmd("rm -rf hlog.*" ++ atom_to_list(N) ++ "*"),
@@ -3471,7 +3471,7 @@ chain_t61(OptionList) ->
     brick_simple:unset_gh(Node, Tab),
     brick_simple:set_gh(Node, Tab, GHmig1),
 
-    %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
     %% Race condition #1:
     %% a. Send sweep including K.
     %% b. Send set for K, before step a has finished logging to disk.
@@ -3489,40 +3489,40 @@ chain_t61(OptionList) ->
         {Br, Nd} <- FirstBrick],
     ?ELOG_INFO("Test race1 finished\n"),
 
-%     Race condition #2:
-%     a. Send set for K.
-%     b. Send sweep including K, before step a has finished logging to disk.
-%     Use 2 bricks this time.
-%     Fstop_start(Name1),
-%     Fstop_start(Name2),
-%     timer:sleep(300),
-%     ?M:chain_role_standalone(Name1, Node),
-%     ?M:chain_set_my_repair_state(Name1, Node, ok),
-%     ?M:chain_role_standalone(Name2, Node),
-%     ?M:chain_set_my_repair_state(Name2, Node, ok),
+    %%     Race condition #2:
+    %%     a. Send set for K.
+    %%     b. Send sweep including K, before step a has finished logging to disk.
+    %%     Use 2 bricks this time.
+    %%     Fstop_start(Name1),
+    %%     Fstop_start(Name2),
+    %%     timer:sleep(300),
+    %%     ?M:chain_role_standalone(Name1, Node),
+    %%     ?M:chain_set_my_repair_state(Name1, Node, ok),
+    %%     ?M:chain_role_standalone(Name2, Node),
+    %%     ?M:chain_set_my_repair_state(Name2, Node, ok),
 
-%     LHmig2a = brick_hash:naive_init(Chain1List),
-%     LHmig2b = brick_hash:naive_init(Chain2List),
-%     GHmig2 = brick_hash:init_global_hash_state(true, pre, 1,
-%                                              LHmig2a, Chain1List,
-%                                              LHmig2b, Chain2List),
-%     brick_server:chain_hack_set_global_hash(Name1, Node, GHmig2),
-%     brick_server:chain_hack_set_global_hash(Name2, Node, GHmig2),
-%     brick_simple:unset_gh(Node, Tab),
-%     brick_simple:set_gh(Node, Tab, GHmig2),
+    %%     LHmig2a = brick_hash:naive_init(Chain1List),
+    %%     LHmig2b = brick_hash:naive_init(Chain2List),
+    %%     GHmig2 = brick_hash:init_global_hash_state(true, pre, 1,
+    %%                                              LHmig2a, Chain1List,
+    %%                                              LHmig2b, Chain2List),
+    %%     brick_server:chain_hack_set_global_hash(Name1, Node, GHmig2),
+    %%     brick_server:chain_hack_set_global_hash(Name2, Node, GHmig2),
+    %%     brick_simple:unset_gh(Node, Tab),
+    %%     brick_simple:set_gh(Node, Tab, GHmig2),
 
-%     brick_server:migration_start_sweep(Name1, Node, foocookie, Chain1Name, []),
-%     brick_server:migration_start_sweep(Name2, Node, foocookie, Chain2Name, []),
-%     {Name1, Node} ! kick_next_sweep,
-%     {Name2, Node} ! kick_next_sweep,
-%     timer:sleep(20),
-%     OK, now let's do the race, using the same bits from race #1.
-%     spawn(fun() -> ok = brick_simple:set(Tab, Race1Key, <<"v 1b">>) end),
-%     erlang:yield(),
-%     timer:sleep(10),
-%     gen_server:cast({Name1, Node}, Race1Sweep),
-%     timer:sleep(1000),
-%     _X = brick_simple:get(Tab, Race1Key), io:format("_X = ~p\n", [_X]),
+    %%     brick_server:migration_start_sweep(Name1, Node, foocookie, Chain1Name, []),
+    %%     brick_server:migration_start_sweep(Name2, Node, foocookie, Chain2Name, []),
+    %%     {Name1, Node} ! kick_next_sweep,
+    %%     {Name2, Node} ! kick_next_sweep,
+    %%     timer:sleep(20),
+    %%     OK, now let's do the race, using the same bits from race #1.
+    %%     spawn(fun() -> ok = brick_simple:set(Tab, Race1Key, <<"v 1b">>) end),
+    %%     erlang:yield(),
+    %%     timer:sleep(10),
+    %%     gen_server:cast({Name1, Node}, Race1Sweep),
+    %%     timer:sleep(1000),
+    %%     _X = brick_simple:get(Tab, Race1Key), io:format("_X = ~p\n", [_X]),
 
     %% Race #3: setup 2 bricks, chains 1 & 2 migrating -> 1
 
@@ -3544,7 +3544,7 @@ chain_t61(OptionList) ->
     brick_simple:unset_gh(Node, Tab),
     brick_simple:set_gh(Node, Tab, GHmig3),
 
-    %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
     %% Race condition #3 continued: ping-pong
     %% a. Two chains, C1 & C2, are migrating to a single chain, C1.
     %% b. Both chains are empty.
@@ -3562,7 +3562,7 @@ chain_t61(OptionList) ->
         {Br, Nd} <- BothBricks],
     ?ELOG_INFO("Test race3 finished\n"),
 
-    %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
     %% Race condition #4: Start a slow migration, kill a brick, then
     %% have the restart work correctly.
     %% At the start we have 1 chain of length 1 via GHmig3.
@@ -3587,8 +3587,8 @@ chain_t61(OptionList) ->
     %% the migration.
     timer:sleep(2000),
     %% Do not use Fstop_start() here: it will delete our brick's state!
-% io:format("DBG: dumping Name1 log\n"),
-% brick_ets:debug_scan("hlog.regression_1"),
+    %% io:format("DBG: dumping Name1 log\n"),
+    %% brick_ets:debug_scan("hlog.regression_1"),
     ?ELOG_INFO("Stopping ~p\n", [Name1]),
     ?M:stop(Name1),
     catch exit(whereis(Name1), kill), timer:sleep(50),
@@ -3600,8 +3600,8 @@ chain_t61(OptionList) ->
     ?M:chain_set_my_repair_state(Name1, Node, ok),
     brick_server:chain_hack_set_global_hash(Name1, Node, GHmig4),
     ?ELOG_INFO("Startup of ~p finished, start sweeping\n", [Name1]),
-% io:format("DBG: dumping Name1 log AGAIN\n"),
-% brick_ets:debug_scan("hlog.regression_1"),
+    %% io:format("DBG: dumping Name1 log AGAIN\n"),
+    %% brick_ets:debug_scan("hlog.regression_1"),
     ok = brick_server:migration_start_sweep(Name1, Node, foocookie, Chain1Name,
                                             SlowOpts),
     %% Nothing more to do here ... need to look at app log for
@@ -3645,7 +3645,7 @@ chain_t62(OptionList) ->
             {ok, _TailPid} = safe_start_link(NameTail, OptionList)
     end,
 
-%%     chain_start_entire_chain(Chain, OptionList, true),
+    %%     chain_start_entire_chain(Chain, OptionList, true),
     if true ->
             ?M:chain_role_standalone(NameHead, Node),
             ?M:chain_set_my_repair_state(NameHead, Node, ok),
@@ -3783,11 +3783,11 @@ chain_start_entire_2([{Head, NodeHead}, {Tail, NodeTail}] = BrickList, Options, 
             %% Get the head running first, then build the chain backward.
             ok = brick_server:chain_set_my_repair_state(Head, NodeHead, ok),
             ok = brick_server:chain_role_head(Head, NodeHead,
-                                                  Tail, NodeTail,
-                                                  [{official_tail, true}]),
+                                              Tail, NodeTail,
+                                              [{official_tail, true}]),
             ok = brick_server:chain_role_tail(Tail, NodeTail,
-                                                  Head, NodeHead,
-                                                  [{official_tail, false}]),
+                                              Head, NodeHead,
+                                              [{official_tail, false}]),
             ok = brick_server:chain_start_repair(Head, NodeHead),
             _NumPolls = repair_poll(Head, NodeHead, 100),
             io:format("ZZZ: repair ~w -> ~w took ~w polls\n",
@@ -3814,12 +3814,12 @@ chain_start_entire_N(BrickList, Options, FullStartP) when length(BrickList) > 2 
             %% Get the head running first, then build the chain backward.
             ok = brick_server:chain_set_my_repair_state(Head, NodeHead, ok),
             ok = brick_server:chain_role_head(Head, NodeHead,
-                                                  FirstMid, NodeFirstMid,
-                                                  [{official_tail, true}]),
+                                              FirstMid, NodeFirstMid,
+                                              [{official_tail, true}]),
             %% Tail
             ok = brick_server:chain_role_tail(Tail, NodeTail,
-                                                  LastMid, NodeLastMid,
-                                                  [{official_tail, false}]),
+                                              LastMid, NodeLastMid,
+                                              [{official_tail, false}]),
             lists:foreach(
               fun([{Up, UpNode}, {Mid, MidNode}, {Down, DownNode}] =_QQQ) ->
                       ok = brick_server:chain_role_middle(Mid, MidNode,
@@ -3854,18 +3854,18 @@ chain_start_entire_N(BrickList, Options, FullStartP) when length(BrickList) > 2 
 
     %% Define the final roles, starting at the tail of the chain.
     ok = brick_server:chain_role_tail(Tail, NodeTail,
-                                          LastMid, NodeLastMid,
-                                          []),
+                                      LastMid, NodeLastMid,
+                                      []),
     lists:foreach(
       fun([{Up, UpNode}, {Mid, MidNode}, {Down, DownNode}]) ->
               ok = brick_server:chain_role_middle(Mid, MidNode,
-                                                      Up, UpNode,
-                                                      Down, DownNode,
-                                                      [])
+                                                  Up, UpNode,
+                                                  Down, DownNode,
+                                                  [])
       end, lists:reverse(Triples)),
     ok = brick_server:chain_role_head(Head, NodeHead,
-                                          FirstMid, NodeFirstMid,
-                                          []),
+                                      FirstMid, NodeFirstMid,
+                                      []),
     ok.
 
 start_bricklist(BrickList, Options) ->
@@ -3901,32 +3901,32 @@ keyuniq(N, [H|T]) ->
 put_rand_keys_via_simple(Tab, MaxKey, Num, KeyPrefix, KeySuffix, ValLen,
                          SleepTime, DoAsyncP) ->
     Val = list_to_binary(lists:duplicate($v, ValLen)),
-    [ok = begin
-              Parent = self(),
-              F = fun() ->
-                          {A, B, C} = now(),
-                          random:seed(A, B, C),
-                          RandL = integer_to_list(random:uniform(MaxKey)),
-                          Key = gmt_util:bin_ify(KeyPrefix ++ RandL ++ KeySuffix),
-                          case brick_simple:set(Tab, Key, Val, 60*1000) of
-                              ok -> ok;
-                              {ts_error, _} -> ok
-                          end,
-                          if (DoAsyncP) ->
-                                  io:format("set ~w ", [Parent]),
-                                  unlink(Parent),
-                                  exit(normal);
-                             true ->
-                                  ok
-                          end
-                  end,
-              if DoAsyncP -> spawn_link(F);
-                 true     -> F()
-              end,
-              if SleepTime > 0 -> timer:sleep(SleepTime);
-                 true          -> ok  end,
-              ok
-          end || _ <- lists:seq(1, Num)],
+    [begin
+         Parent = self(),
+         F = fun() ->
+                     {A, B, C} = now(),
+                     random:seed(A, B, C),
+                     RandL = integer_to_list(random:uniform(MaxKey)),
+                     Key = gmt_util:bin_ify(KeyPrefix ++ RandL ++ KeySuffix),
+                     case brick_simple:set(Tab, Key, Val, 60*1000) of
+                         ok -> ok;
+                         {ts_error, _} -> ok
+                     end,
+                     if (DoAsyncP) ->
+                             io:format("set ~w ", [Parent]),
+                             unlink(Parent),
+                             exit(normal);
+                        true ->
+                             ok
+                     end
+             end,
+         if DoAsyncP -> spawn_link(F);
+            true     -> F()
+         end,
+         if SleepTime > 0 -> timer:sleep(SleepTime);
+            true          -> ok  end,
+         ok
+     end || _ <- lists:seq(1, Num)],
     ok.
 
 xform_ets_dump(TabName, [H|T]) ->
@@ -4049,8 +4049,8 @@ exp0(SetUpBricksP, NumMigratingToView, Options)
     end,
 
     LH1 = brick_hash:naive_init([Ch20]),
-%     GH1 = brick_hash:init_global_hash_state(false, unused, 1,
-%                                               LH1, [Ch20], LH1, [Ch20]),
+    %%     GH1 = brick_hash:init_global_hash_state(false, unused, 1,
+    %%                                               LH1, [Ch20], LH1, [Ch20]),
     LH2 = brick_hash:naive_init(ChList20),
 
     {LHcur, LHnew} =
@@ -4062,8 +4062,8 @@ exp0(SetUpBricksP, NumMigratingToView, Options)
     %% Using a chain list that's too long (list len = 2, LH1 uses only 1)
     %% is OK.
     GHnew = brick_hash:init_global_hash_state(true, unused, 1,
-                                                  LHcur, ChList20,
-                                                  LHnew, ChList20),
+                                              LHcur, ChList20,
+                                              LHnew, ChList20),
 
     [brick_server:chain_hack_set_global_hash(Br, node(), GHnew) ||
         Br <- [Brick20, Brick21]],

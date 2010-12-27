@@ -1316,10 +1316,12 @@ bootstrap_scan_loop2() ->
                        %% so theory says no brick options are necessary here.
                        %% However, will that always be true?
                        [_ = (catch start_brick_only(B)) || B <- Bricks],
-                       [_ = {(catch brick_server:chain_set_my_repair_state(
-                                      Br, Nd, ok)),
-                             (catch brick_server:chain_role_standalone(
-                                      Br, Nd))} || {Br, Nd} <- Bricks],
+                       [_ = begin
+                                (catch brick_server:chain_set_my_repair_state(
+                                         Br, Nd, ok)),
+                                (catch brick_server:chain_role_standalone(
+                                         Br, Nd))
+                            end || {Br, Nd} <- Bricks],
                        unlink(Self),
                        exit(normal)
                end),
