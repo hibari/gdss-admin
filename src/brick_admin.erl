@@ -162,7 +162,7 @@
 
 -export_type([brick/0]).
 
--type brick() :: {atom(),atom()}.
+-type brick() :: {atom(),node()}.
 -type bricklist() :: [brick()].
 -type chainlist() ::  [{atom(),bricklist()}].
 -type proplist() :: [ atom() | {any(),any()} ].
@@ -208,9 +208,10 @@
 -spec spam_gh_to_all_nodes(pid()) -> ok.
 -spec start([file:name()]|file:name()) -> ok | error().
 -spec start_brick_only(brick()) -> ok.
--spec start_brick_only(atom(),atom()) -> ok.
--spec start_brick_only(atom(),atom(),proplist()) -> ok.
+-spec start_brick_only(atom(),node()) -> ok.
+-spec start_brick_only(atom(),node(),proplist()) -> ok.
 -spec stop_brick_only(brick()) -> ok.
+-spec stop_brick_only(atom(),node()) -> ok.
 -spec table_finished_migration(atom()) -> {table_finished_migration,any()}.
 
 

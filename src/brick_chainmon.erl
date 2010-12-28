@@ -108,27 +108,31 @@
 -export([set_all_chain_roles/1,
          stitch_op_state/1, figure_out_current_chain_op_status/1]).
 
--export_type([brick_list/0]).
+-export_type([bricklist/0]).
 
--type brick_list() :: list({brick_bp:brick_name(), node()}).
+-type brick() :: {atom(),node()}.
+-type bricklist() :: [brick()].
+-type brick_name() :: atom().
+-type chain_name() :: atom().
+-type state_name() :: atom().
 
 -type new_internal_status() :: unknown | pre_init | ok | repairing | repair_overload | disk_error.
 -type last_internal_status() :: new_internal_status() | unknown2.
 
--type new_brickstatus_list() :: list({brick_server:brick(), new_internal_status()}).
--type last_brickstatus_list() :: list({brick_server:brick(), last_internal_status()}).
--type diff_brickstatus_list() ::  list({brick_server:brick(), {last_internal_status(), new_internal_status()}}).
+-type new_brickstatus_list() :: [{brick(), new_internal_status()}].
+-type last_brickstatus_list() :: [{brick(), last_internal_status()}].
+-type diff_brickstatus_list() ::  [{brick(), {last_internal_status(), new_internal_status()}}].
 
 -record(state, {
-          chain                :: brick_server:chain_name(),
-          bricks               :: brick_list(),
-          chainlen             :: integer(),
-          tref                 :: reference(),
-          last_bricks_status   :: last_brickstatus_list(),
-          chain_now            :: brick_list() | undefined,
-          repairing_brick      :: {brick_bp:brick_name(), node()} | undefined, %% brick in degraded state
-          num_checks = 0       :: integer(),
-          sb_pid               :: pid()     %% pid of scoreboard server
+          chain                 :: chain_name(),
+          bricks                :: bricklist(),
+          chainlen              :: integer(),
+          tref                  :: reference(),
+          last_bricks_status=[] :: last_brickstatus_list(),
+          chain_now=[]          :: bricklist(),
+          repairing_brick       :: brick() | undefined, %% brick in degraded state
+          num_checks=0          :: integer(),
+          sb_pid                :: pid()     %% pid of scoreboard server
          }).
 
 %% For opconf_r record, see brick_admin.hrl
@@ -437,7 +441,7 @@ do_check_status(unknown, S) when S#state.num_checks == 10 ->
 do_check_status(StateName, S) ->
     do_check_status2(StateName, S).
 
--spec calculate_any_best_first_brick(#state{}) -> list(brick_server:brick()).
+-spec calculate_any_best_first_brick(#state{}) -> list(brick()).
 calculate_any_best_first_brick(S) ->
     Fpoll = fun({Br, Nd} = B) ->
                     case brick_sb:get_brick_history(Br, Nd) of
@@ -458,7 +462,7 @@ calculate_any_best_first_brick(S) ->
     ?DBG_CHAINx(SortHist),
     [Br || {_LastDownTime, Br} <- SortHist].
 
--spec calculate_best_first_brick(#state{}) -> brick_server:brick().
+-spec calculate_best_first_brick(#state{}) -> brick().
 calculate_best_first_brick(S) ->
     hd(calculate_any_best_first_brick(S)).
 
@@ -494,7 +498,7 @@ calculate_best_first_brick(S) ->
 %%      the binary &lt;&lt;"No record of down"&gt;&gt; so it will always sort
 %%      ahead of the other two cases. </li>
 %% </ul>
--spec calculate_best_first_brick2(list({list(#hevent{}), brick_server:brick()})) -> list({atom()|binary()|brick_bp:nowtime(), brick_server:brick()}).
+-spec calculate_best_first_brick2(list({list(#hevent{}), brick()})) -> list({atom()|binary()|brick_bp:nowtime(), brick()}).
 calculate_best_first_brick2(Hist1) ->
     Fis_an_ok = fun(#hevent{what = state_change, detail = ok}) ->
                         true;
@@ -580,7 +584,7 @@ do_check_status2(StateName, S) when is_record(S, state) ->
 chain2name(Chain) ->
     list_to_atom(lists:flatten(io_lib:format("chmon_~w", [Chain]))).
 
--spec get_brickstatus(brick_list()) -> new_brickstatus_list().
+-spec get_brickstatus(bricklist()) -> new_brickstatus_list().
 get_brickstatus(Bricks) ->
     {ok, Statuses} = brick_sb:get_multiple_statuses(
                        [{brick, Br} || Br <- Bricks]),
@@ -589,7 +593,7 @@ get_brickstatus(Bricks) ->
 
 %% Note weird quirk in {ok, _} wrapper around Status!!
 
--spec external_to_internal_status(brick_server:brick(), {ok, brick_bp:state_name()} | atom()) -> new_internal_status().
+-spec external_to_internal_status(brick(), {ok, state_name()} | atom()) -> new_internal_status().
 external_to_internal_status(_B, Status) ->
     case Status of
         {ok, X} when X == unknown; X == pre_init; X == ok ; X == repairing;
@@ -674,9 +678,7 @@ process_brickstatus_diffs(StateName, _DiffList, _LastBricksStatus,
                                               chain_now = S#state.bricks,
                                               repairing_brick = undefined}};
                        GH#g_hash_r.migrating_p == true ->
-                            NewChain = if S#state.chain_now == undefined
-                                          orelse
-                                          S#state.chain_now == [] ->
+                            NewChain = if S#state.chain_now == [] ->
                                                S#state.bricks;
                                           is_list(S#state.chain_now) ->
                                                S#state.chain_now
@@ -980,7 +982,7 @@ process_brickstatus_diffs(_StateName, _DiffList, _LastBricksStatus,
                [_StateName, _DiffList, _LastBricksStatus, _NewBricksStatus]),
     qqqqqqqqqqqqqqq_unfinished2.
 
--spec process_brickstatus_some_ok(atom(), new_brickstatus_list(), brick_list(), #state{}) -> {atom(), #state{}}.
+-spec process_brickstatus_some_ok(atom(), new_brickstatus_list(), bricklist(), #state{}) -> {atom(), #state{}}.
 process_brickstatus_some_ok(StateName, NewBricksStatus, OK_Bricks, S) ->
     case (catch figure_out_current_chain_op_status(OK_Bricks)) of
         {ok, ChainList, RepairingBrick} ->
@@ -1018,7 +1020,7 @@ process_brickstatus_some_ok(StateName, NewBricksStatus, OK_Bricks, S) ->
 %% 2. Stop all others.
 %% 3. Someone else can add the others to the chain as the bricks return to
 %%    pre_init state.
--spec process_brickstatus_some_ok_fallback(atom(), new_brickstatus_list(), brick_list(), #state{}) -> {degraded, #state{}}.
+-spec process_brickstatus_some_ok_fallback(atom(), new_brickstatus_list(), bricklist(), #state{}) -> {degraded, #state{}}.
 process_brickstatus_some_ok_fallback(_StateName, NewBricksStatus,
                                      OK_Bricks, S) ->
     B1 = whittle_chain_to_1(OK_Bricks, S),
@@ -1046,7 +1048,7 @@ process_brickstatus_some_ok_fallback(_StateName, NewBricksStatus,
 %% We expect that the caller is catch'ing errors or, if not, is not
 %% afraid to crash.
 
--spec figure_out_current_chain_op_status(brick_list()) -> {ok, brick_list(), brick_server:brick() | undefined}.
+-spec figure_out_current_chain_op_status(bricklist()) -> {ok, bricklist(), brick() | undefined}.
 figure_out_current_chain_op_status(OK_Bricks) ->
     OpCs = lists:map(
              fun({Br, Nd} = B) ->
@@ -1078,7 +1080,7 @@ figure_out_current_chain_op_status(OK_Bricks) ->
 %% state correctly).  So, use a separate proc to do the calculation so any
 %% table leaks will automatically be cleaned up.
 
--spec stitch_op_state(list(#opconf_r{})) -> {brick_list(), brick_server:brick() | undefined}.
+-spec stitch_op_state(list(#opconf_r{})) -> {bricklist(), brick() | undefined}.
 stitch_op_state([OpC]) ->
     %% Sanity checking for a standalone brick.
     standalone = OpC#opconf_r.role,
@@ -1113,7 +1115,7 @@ stitch_op_state_2(OpCs, ParentPid) ->
     ParentPid ! {self(), Reply},
     exit(normal).
 
--spec stitch_op_state_3(list(#opconf_r{})) -> {brick_list(), brick_server:brick() | undefined}.
+-spec stitch_op_state_3(list(#opconf_r{})) -> {bricklist(), brick() | undefined}.
 stitch_op_state_3(OpCs) ->
     %% Small sanity checks here.
     true = (length(OpCs) == length(list_uniq(lists:sort(OpCs)))),
@@ -1178,22 +1180,22 @@ stitch_op_state_3(OpCs) ->
 substitute_prop(PropList, Key, NewVal) ->
     lists:keyreplace(Key, 1, PropList, {Key, NewVal}).
 
--spec is_brick_x(new_internal_status()) -> fun((brick_server:brick()) -> boolean()).
+-spec is_brick_x(new_internal_status()) -> fun((brick()) -> boolean()).
 is_brick_x(Status) ->
     fun({_B, S}) when S == Status -> true;
        (_)                        -> false
     end.
 
--spec is_brick_unknown(brick_server:brick()) -> boolean().
+-spec is_brick_unknown(brick()) -> boolean().
 is_brick_unknown(B) -> (is_brick_x(unknown))(B).
 
--spec is_brick_pre_init(brick_server:brick()) -> boolean().
+-spec is_brick_pre_init(brick()) -> boolean().
 is_brick_pre_init(B) -> (is_brick_x(pre_init))(B).
 
--spec is_brick_ok(brick_server:brick()) -> boolean().
+-spec is_brick_ok(brick()) -> boolean().
 is_brick_ok(B) -> (is_brick_x(ok))(B).
 
--spec go_start_1chain_sync(brick_server:brick()) -> ok.
+-spec go_start_1chain_sync(brick()) -> ok.
 go_start_1chain_sync({Brick, Node}) ->
     ?DBG_CHAINx({go_start_1chain_sync, {Brick, Node}}),
     ok = do_role_ok(chain_role_standalone, [Brick, Node]),
@@ -1267,7 +1269,7 @@ do_unknown_timeout_decision(S) when is_record(S, state) ->
 %% So, we first shut down all other bricks, starting with (we hope, but isn't
 %% critical) the tail.
 
--spec whittle_chain_to_1(brick_list(), #state{}) -> brick_server:brick().
+-spec whittle_chain_to_1(bricklist(), #state{}) -> brick().
 whittle_chain_to_1(OK_Bricks, S) ->
     {Brick, Node} = B1 = hd(OK_Bricks),
     Other_OK_Bricks = tl(OK_Bricks),
@@ -1289,15 +1291,15 @@ do_role_ok(Func, Args) ->
 %% 100% (as well as we can known in an async network) that each brick is
 %% available and in the ok state that we believe it is.
 
--spec set_all_chain_roles(brick_list()) -> ok.
+-spec set_all_chain_roles(bricklist()) -> ok.
 set_all_chain_roles(BrickList) ->
     set_all_chain_roles(BrickList, #state{chain = no_chain_name_available}).
 
--spec set_all_chain_roles(brick_list(), #state{}) -> ok.
+-spec set_all_chain_roles(bricklist(), #state{}) -> ok.
 set_all_chain_roles(BrickList, S) ->
     set_all_chain_roles(BrickList, skip, S).
 
--spec set_all_chain_roles(brick_list(), brick_list() | skip, #state{}) -> ok.
+-spec set_all_chain_roles(bricklist(), bricklist() | skip, #state{}) -> ok.
 set_all_chain_roles(BrickList, OldBrickList, S) ->
     ?E_INFO("set_all_chain_roles: ~p: top\n", [S#state.chain]),
     ?DBG_CHAINx({set_all_chain_roles, S#state.chain, read_only, 1}),
@@ -1366,7 +1368,7 @@ set_all_chain_roles(BrickList, OldBrickList, S) ->
     ?DBG_CHAINx({set_all_chain_roles, S#state.chain, read_only, false}),
     ok = set_all_read_only(BrickList, false).
 
--spec set_all_chain_roles2(brick_list(), #state{}) -> ok.
+-spec set_all_chain_roles2(bricklist(), #state{}) -> ok.
 set_all_chain_roles2([], S) ->
     ?E_WARNING("set_all_chain_roles2: empty list for ~p\n",
                [S#state.chain]),
@@ -1435,7 +1437,7 @@ set_all_chain_roles2(BrickList, _S) ->
 %% <li> Finally, set all the chain roles using the desired chain order. </li>
 %% </ul>
 
--spec set_all_chain_roles_reorder(brick_server:chain_name(), brick_list(), brick_list(), #state{}) -> ok.
+-spec set_all_chain_roles_reorder(chain_name(), bricklist(), bricklist(), #state{}) -> ok.
 set_all_chain_roles_reorder(ChainName, BrickList, OldBrickList, S) ->
     ?DBG_CHAINx({set_all_chain_roles_reorder, S#state.chain, read_only, true}),
     ok = set_all_read_only(BrickList, true),
@@ -1470,13 +1472,13 @@ set_all_chain_roles_reorder(ChainName, BrickList, OldBrickList, S) ->
     _ = gmt_loop:do_while(Fpoll, 0),
     ok.
 
--spec set_all_read_only(brick_list(), true | false) -> ok.
+-spec set_all_read_only(bricklist(), true | false) -> ok.
 set_all_read_only(BrickList, Mode_p) when is_list(BrickList) ->
     [ok = brick_server:chain_set_read_only_mode(Brick, Node, Mode_p) ||
         {Brick, Node} <- BrickList],
     ok.
 
--spec add_repair_brick_to_end(brick_server:brick(), #state{}) -> ok.
+-spec add_repair_brick_to_end(brick(), #state{}) -> ok.
 add_repair_brick_to_end({NewTail, NewTailNode} = _NewTailBrick, S) ->
     ChainNow = S#state.chain_now,
     {NowLast1, NowLast1Node} = NowLast1Brick = lists:last(ChainNow),
@@ -1537,7 +1539,7 @@ add_repair_brick_to_end({NewTail, NewTailNode} = _NewTailBrick, S) ->
     end,
     ok.
 
--spec poll_for_full_sync(brick_bp:brick_name(), node(), integer()) -> ok | {poll_for_full_sync, timeout, integer(), integer()}.
+-spec poll_for_full_sync(brick_name(), node(), integer()) -> ok | {poll_for_full_sync, timeout, integer(), integer()}.
 poll_for_full_sync(Brick, Node, TimeLimit_0) ->
     TimeLimit = TimeLimit_0 * 1000,             % Convert to usec.
     Start = now(),
@@ -1619,7 +1621,7 @@ info_state_r() ->
     Es = record_info(fields, state),
     lists:zip(lists:seq(2, length(Es) + 1), Es).
 
--spec check_difflist_for_disk_error(brick_list(), #state{}) -> ok.
+-spec check_difflist_for_disk_error(bricklist(), #state{}) -> ok.
 check_difflist_for_disk_error(DiffList, _S) ->
     lists:foreach(
       fun({{_Br, Nd} = Brick, {OldState, NewState}}) ->
@@ -1635,7 +1637,7 @@ check_difflist_for_disk_error(DiffList, _S) ->
               end
       end, DiffList).
 
--spec set_global_hash_wrapper(brick_bp:brick_name(), node(), #g_hash_r{}) -> ok.
+-spec set_global_hash_wrapper(brick_name(), node(), #g_hash_r{}) -> ok.
 set_global_hash_wrapper(Brick, Node, GH) ->
     case brick_server:chain_hack_set_global_hash(Brick, Node, GH) of
         ok ->

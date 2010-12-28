@@ -42,14 +42,14 @@
 
 -record(schema_r, {
           %% Where are all redundant copies of this schema stored?
-          schema_bricklist      :: brick_chainmon:brick_list(),                 % list(brick_t())
+          schema_bricklist      :: brick_chainmon:bricklist(),
 
           %% Dictionary of all table definitions
           %% Key = table name, Val = table_r()
-          tabdefs                               :: dict(),                         % dict:new()
+          tabdefs                               :: dict(),
 
           %% Mapping of chain to table name
-          chain2tab                             :: dict()                          % dict:new()
+          chain2tab                             :: dict()
          }).
 
 -record(table_r, {
