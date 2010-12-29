@@ -86,6 +86,7 @@
 %% API
 -export([start/1, stop/0, start_remote/1, % original API
          start/2, stop/1, % OTP application API
+         schema_filename/0,
          create_new_schema/2, create_new_schema/3,
          copy_new_schema/2, copy_new_schema/3, do_copy_new_schema3/2,
          start_bootstrap_scan/0, get_schema_bricks/0, get_schema_bricks/1,
@@ -204,6 +205,7 @@
 -spec load_bootstrap_data(bricklist(),fun(({any(),any()})->boolean())) -> term().
 -spec make_chain_description(atom(),non_neg_integer(),[atom()]) -> [{atom(),any()}].
 -spec make_common_table_opts(proplist(),boolean(),char(),non_neg_integer(),chainlist()) -> proplist().
+-spec schema_filename() -> file:name().
 -spec spam_gh_to_all_nodes() -> ok.
 -spec spam_gh_to_all_nodes(pid()) -> ok.
 -spec start([file:name()]|file:name()) -> ok | error().
@@ -310,7 +312,7 @@ start(normal, Args) ->
 
     case brick_admin_sup:start_link() of
         {ok, _Pid}=Ok ->
-            brick_admin:start("Schema.local"),
+            brick_admin:start(schema_filename()),
             Ok;
         Error ->
             Error
@@ -322,6 +324,9 @@ start(StartMethod, Args) ->
 stop(Args) ->
     ?ELOG_INFO("stop, Args = ~p", [Args]),
     ok.
+
+schema_filename() ->
+    "Schema.local".
 
 create_new_schema(InitialBrickList, File) ->
     create_new_schema(InitialBrickList, [], File).
@@ -1431,7 +1436,7 @@ do_add_bootstrap_copy(BrickList, State) ->
             %% start new bootstrap bricks.
             [catch start_standalone_brick(Brick) || Brick <- BrickList],
             %% Update the schema hint file
-            BootstrapFile = "Schema.local",
+            BootstrapFile = schema_filename(),
             OldFile = BootstrapFile ++ integer_to_list(gmt_time:time_t()),
             file:rename(BootstrapFile, OldFile),
             ok = write_schema_bootstrap_file(BootstrapFile, NewBootList),
@@ -2073,7 +2078,7 @@ bootstrap_local(DataProps, VarPrefixP, PrefixSep, NumSep, Bricks,
 bootstrap_local(DataProps, VarPrefixP, PrefixSep, NumSep, Bricks,
                 BricksPerChain, _BootstrapNodes, Props) ->
     NodeList = lists:duplicate(Bricks, node()),
-    bootstrap("Schema.local", DataProps, VarPrefixP, PrefixSep, NumSep,
+    bootstrap(schema_filename(), DataProps, VarPrefixP, PrefixSep, NumSep,
               NodeList, BricksPerChain, [node()], Props).
 
 %% add the given bricks as bootstrap_copy bricks.
@@ -2537,7 +2542,7 @@ send_log_replay(Key, TS, Exp, Val, Flags, UpBrick, UpNode, NewBrick, NewNode) ->
 
 -spec upgrade_20090320(list(atom() | list())) -> no_return().
 upgrade_20090320([A]) when is_atom(A) ->
-    case catch rpc:call(A, ?MODULE, fix_gh_20090320, ["Schema.local"]) of
+    case catch rpc:call(A, ?MODULE, fix_gh_20090320, [schema_filename()]) of
         ok ->
             io:format("Upgrade successful.\n"),
             timer:sleep(250),

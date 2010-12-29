@@ -66,7 +66,7 @@ admin_status_client_mons(C) ->
     admin_http_to_text(C, "/change_client_monitor.html").
 
 bootstrap_config(C) ->
-    {ok, Bin} = file:read_file("Schema.local"),
+    {ok, Bin} = file:read_file(brick_admin:schema_filename()),
     cluster_info:send(C, Bin).
 
 history_dump(C) ->

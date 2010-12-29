@@ -970,7 +970,7 @@ get_bootstrap(Query, ModData) ->
      _NumNodesPerBlock, _BlockMultFactor} =
         parse_query_for_add_table(Query),
     {_, Boots} = read_bootstrap_nodes(),
-    LocalBtFile = "Schema.local",
+    LocalBtFile = brick_admin:schema_filename(),
 
     try if
             LocalP ->
