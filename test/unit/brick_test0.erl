@@ -3671,7 +3671,6 @@ chain_t62(OptionList) ->
     {ok, _, OldVal} = ?M:get(NameTail, Node, Key),
     Ack0 = get_chain_last_ack(NameHead, Node),
     Ack1 = get_chain_last_ack_different(NameHead, Node, Ack0, 10),
-    io:format("DEBUG: ~p ~p\n", [Ack0, Ack1]),
 
     ?M:delete(NameHead, Node, Key),
     spawn(fun() -> ?M:set(NameHead, Node, Key, MidVal) end),
@@ -3683,8 +3682,7 @@ chain_t62(OptionList) ->
     timer:sleep(10),
     brick_server:chain_flush_log_downstream(NameHead, Node),
     %% ok = ?M:set(NameHead, Node, Key, NewVal),
-    Ack2 = get_chain_last_ack_different(NameHead, Node, Ack1, 10),
-    io:format("DEBUG: ~p ~p\n", [Ack1, Ack2]),
+    _Ack2 = get_chain_last_ack_different(NameHead, Node, Ack1, 10),
 
     _GetRes = ?M:get(NameTail, Node, Key),
     {ok, _, MidVal} = ?M:get(NameTail, Node, Key),

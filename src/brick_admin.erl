@@ -313,7 +313,6 @@ start(normal, Args) ->
             brick_admin:start("Schema.local"),
             Ok;
         Error ->
-            io:format("DEBUG: ~s:start bummer: ~w\n", [?MODULE, Error]),
             Error
     end;
 start(StartMethod, Args) ->
