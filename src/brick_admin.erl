@@ -1864,10 +1864,12 @@ sup_stop_status(X) ->                  X.
 
 %% @doc Local wrapper for brick_squorum:get()
 
--spec squorum_get(brick_squorum:brick_list(),
-                  key() | ?BKEY_CLIENT_MONITOR | ?BKEY_SCHEMA_DEFINITION) ->
-                         {ok, ts(), #schema_r{}} |
-                             {ts_error, ts()} | key_not_exist | error | quorum_error.
+-spec squorum_get(brick_squorum:brick_list(), ?BKEY_SCHEMA_DEFINITION) ->
+                         {ok, ts(), #schema_r{}}
+                             | {ts_error, ts()} | key_not_exist | error | quorum_error;
+                 (brick_squorum:brick_list(), ?BKEY_CLIENT_MONITOR) ->
+                         {ok, ts(), [atom()]}
+                             | {ts_error, ts()} | key_not_exist | error | quorum_error.
 squorum_get(Bricks, Key) ->
     case brick_squorum:get(Bricks, term_to_binary(Key)) of
         {ok, TS, Val} ->
@@ -1879,6 +1881,8 @@ squorum_get(Bricks, Key) ->
 %% @doc Local wrapper for brick_squorum:set()
 
 -spec squorum_set(brick_squorum:brick_list(), ?BKEY_SCHEMA_DEFINITION, #schema_r{}) ->
+                         brick_squorum:set_res();
+                 (brick_squorum:brick_list(), ?BKEY_CLIENT_MONITOR, [atom()]) ->
                          brick_squorum:set_res().
 squorum_set(Bricks, Key, Val) ->
     brick_squorum:set(Bricks, term_to_binary(Key), term_to_binary(Val)).
@@ -1889,9 +1893,7 @@ squorum_set(Bricks, Key, Val, ExpTime, Flags, Timeout) ->
 
 %% @doc Local wrapper for brick_squorum:get_keys()
 
--spec squorum_get_keys(brick_squorum:brick_list(),
-                       key() | ?BRICK__GET_MANY_FIRST,
-                       integer()) ->
+-spec squorum_get_keys(brick_squorum:brick_list(), ?BRICK__GET_MANY_FIRST, integer()) ->
                               {ok, list(), boolean()}.
 squorum_get_keys(Bricks, Key, MaxNum) ->
     {ok, Keys, Bool} = brick_squorum:get_keys(Bricks, term_to_binary(Key), MaxNum),
