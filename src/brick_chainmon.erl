@@ -110,25 +110,29 @@
 
 -export_type([bricklist/0]).
 
--type brick() :: {atom(),node()}.
--type bricklist() :: [brick()].
--type brick_name() :: atom().
--type chain_name() :: atom().
 -type state_name() :: atom().
+-type chain_name() :: atom().
+-type brick_name() :: atom().
 
--type new_internal_status() :: unknown | pre_init | ok | repairing | repair_overload | disk_error.
--type last_internal_status() :: new_internal_status() | unknown2.
+-type brick() :: {brick_name(),node()}.
+-type bricklist() :: [brick()].
 
--type new_brickstatus_list() :: [{brick(), new_internal_status()}].
--type last_brickstatus_list() :: [{brick(), last_internal_status()}].
--type diff_brickstatus_list() ::  [{brick(), {last_internal_status(), new_internal_status()}}].
+-type now_internal_status() :: unknown | pre_init | ok | repairing | repair_overload | disk_error.
+-type last_internal_status() :: now_internal_status() | unknown2.
+
+-type now_status() :: {brick(), now_internal_status()}.
+-type last_status() :: {brick(), last_internal_status()}.
+
+-type now_status_list() :: [now_status()].
+-type last_status_list() :: [last_status()].
+-type diff_status_list() ::  [{brick(), {last_internal_status(), now_internal_status()}}].
 
 -record(state, {
           chain                 :: chain_name(),
           bricks                :: bricklist(),
           chainlen              :: integer(),
           tref                  :: reference(),
-          last_bricks_status=[] :: last_brickstatus_list(),
+          last_bricks_status=[] :: last_status_list(),
           chain_now=[]          :: bricklist(),
           repairing_brick       :: brick() | undefined, %% brick in degraded state
           num_checks=0          :: integer(),
@@ -391,7 +395,7 @@ handle_sync_event(Event, _From, StateName, State) ->
 %% other message than a synchronous or asynchronous event
 %% (or a system message).
 %%--------------------------------------------------------------------
--spec handle_info(term(), atom(), #state{}) -> {next_state, atom(), #state{}}.
+-spec handle_info(term(), state_name(), #state{}) -> {next_state, state_name(), #state{}}.
 handle_info(check_status, StateName, State) ->
     timer:sleep(random:uniform(500)),
     do_check_status(StateName, State);
@@ -432,7 +436,7 @@ code_change(_OldVsn, StateName, State, _Extra) ->
 %%% Internal functions
 %%--------------------------------------------------------------------
 
--spec do_check_status(atom(), #state{}) -> {next_state, atom(), #state{}}.
+-spec do_check_status(state_name(), #state{}) -> {next_state, state_name(), #state{}}.
 do_check_status(unknown, S) when S#state.num_checks == 10 ->
     gen_fsm:send_event(self(), evt_timeout_during_unknown),
     brick_sb:report_chain_status(S#state.chain, unknown_timeout,
@@ -541,11 +545,11 @@ calculate_best_first_brick2(Hist1) ->
     %% default Erlang term sort order.
     lists:reverse(lists:sort(Hist2)).
 
--spec do_check_status2(atom(), #state{}) -> {next_state, atom(), #state{}}.
+-spec do_check_status2(state_name(), #state{}) -> {next_state, state_name(), #state{}}.
 do_check_status2(StateName, S) when is_record(S, state) ->
     LastBricksStatus = S#state.last_bricks_status,
     NewBricksStatus = get_brickstatus(S#state.bricks),
-    DiffList = diff_brickstatus(LastBricksStatus, NewBricksStatus),
+    DiffList = diff_status_list(LastBricksStatus, NewBricksStatus),
     check_difflist_for_disk_error(DiffList, S),
     {NewStateName, NewS} =
         if DiffList /= [] ->
@@ -580,11 +584,11 @@ do_check_status2(StateName, S) when is_record(S, state) ->
         end,
     {next_state, NewStateName, NewS#state{num_checks = NumChecks}}.
 
--spec chain2name(brick_server:chain_name()) -> atom().
+-spec chain2name(chain_name()) -> atom().
 chain2name(Chain) ->
     list_to_atom(lists:flatten(io_lib:format("chmon_~w", [Chain]))).
 
--spec get_brickstatus(bricklist()) -> new_brickstatus_list().
+-spec get_brickstatus(bricklist()) -> now_status_list().
 get_brickstatus(Bricks) ->
     {ok, Statuses} = brick_sb:get_multiple_statuses(
                        [{brick, Br} || Br <- Bricks]),
@@ -593,7 +597,7 @@ get_brickstatus(Bricks) ->
 
 %% Note weird quirk in {ok, _} wrapper around Status!!
 
--spec external_to_internal_status(brick(), {ok, state_name()} | atom()) -> new_internal_status().
+-spec external_to_internal_status(brick(), {ok, state_name()} | atom()) -> now_internal_status().
 external_to_internal_status(_B, Status) ->
     case Status of
         {ok, X} when X == unknown; X == pre_init; X == ok ; X == repairing;
@@ -607,8 +611,8 @@ external_to_internal_status(_B, Status) ->
             unknown
     end.
 
--spec diff_brickstatus(last_brickstatus_list(), new_brickstatus_list()) -> diff_brickstatus_list().
-diff_brickstatus(L1, L2) ->
+-spec diff_status_list(last_status_list(), now_status_list()) -> diff_status_list().
+diff_status_list(L1, L2) ->
     lists:foldl(
       fun({{B, Status}, {B, Status}}, Acc) ->
               Acc;
@@ -619,13 +623,13 @@ diff_brickstatus(L1, L2) ->
 
 %% Do not call brick_sb:report_chain_status() here, our caller
 %% will do it for us.
--spec process_brickstatus_diffs(atom(), diff_brickstatus_list(), last_brickstatus_list(), new_brickstatus_list(), #state{}) -> {atom(), #state{}}.
+-spec process_brickstatus_diffs(state_name(), diff_status_list() | arg_unused, last_status_list() | arg_unused, now_status_list(), #state{}) -> {state_name(), #state{}}.
 process_brickstatus_diffs(StateName, [] = _DiffList, _LastBricksStatus,
                           _NewBricksStatus, S) ->
     %% There are some conditions where we call ourselves recursively,
     %% but the diff list is now empty.
     {StateName, S};
-                                                %-
+%%-
 process_brickstatus_diffs(StateName, _DiffList, _LastBricksStatus,
                           NewBricksStatus, S)
   when StateName == unknown orelse StateName == stopped orelse
@@ -635,8 +639,7 @@ process_brickstatus_diffs(StateName, _DiffList, _LastBricksStatus,
     AllOK_p = lists:all(fun is_brick_ok/1, NewBricksStatus),
     AnyOK_p = lists:any(fun is_brick_ok/1, NewBricksStatus),
     AllPreInit_p = lists:all(fun is_brick_pre_init/1, NewBricksStatus),
-    OK_Bricks = [B || {B, _} <- lists:filter(fun is_brick_ok/1,
-                                             NewBricksStatus)],
+    OK_Bricks = [B || {B, _} <- lists:filter(fun is_brick_ok/1, NewBricksStatus)],
     %%
     BestBrick = calculate_best_first_brick(S),
     BestStatus = case lists:keysearch(BestBrick, 1, NewBricksStatus) of
@@ -732,7 +735,7 @@ process_brickstatus_diffs(StateName, _DiffList, _LastBricksStatus,
             %% We'll wait until we hear about other bricks, or if we timeout.
             {StateName, S#state{last_bricks_status = NewBricksStatus}}
     end;
-                                                %-
+%%-
 process_brickstatus_diffs(healthy = _StateName, DiffList, LastBricksStatus,
                           _NewBricksStatus, S)
   when is_record(S, state) ->
@@ -777,7 +780,7 @@ process_brickstatus_diffs(healthy = _StateName, DiffList, LastBricksStatus,
             {degraded, S#state{last_bricks_status = NBS,
                                chain_now = NewChain}}
     end;
-                                                %-
+%%-
 process_brickstatus_diffs(degraded = StateName, DiffList, LastBricksStatus,
                           NewBricksStatus, S)
   when is_record(S, state) ->
@@ -974,7 +977,7 @@ process_brickstatus_diffs(degraded = StateName, DiffList, LastBricksStatus,
                     {StateName, S#state{last_bricks_status = LastBricksStatus}}
             end
     end;
-                                                %-
+%%-
 process_brickstatus_diffs(_StateName, _DiffList, _LastBricksStatus,
                           _NewBricksStatus, S)
   when is_record(S, state) ->
@@ -982,7 +985,7 @@ process_brickstatus_diffs(_StateName, _DiffList, _LastBricksStatus,
                [_StateName, _DiffList, _LastBricksStatus, _NewBricksStatus]),
     qqqqqqqqqqqqqqq_unfinished2.
 
--spec process_brickstatus_some_ok(atom(), new_brickstatus_list(), bricklist(), #state{}) -> {atom(), #state{}}.
+-spec process_brickstatus_some_ok(atom(), now_status_list(), bricklist(), #state{}) -> {atom(), #state{}}.
 process_brickstatus_some_ok(StateName, NewBricksStatus, OK_Bricks, S) ->
     case (catch figure_out_current_chain_op_status(OK_Bricks)) of
         {ok, ChainList, RepairingBrick} ->
@@ -1020,7 +1023,7 @@ process_brickstatus_some_ok(StateName, NewBricksStatus, OK_Bricks, S) ->
 %% 2. Stop all others.
 %% 3. Someone else can add the others to the chain as the bricks return to
 %%    pre_init state.
--spec process_brickstatus_some_ok_fallback(atom(), new_brickstatus_list(), bricklist(), #state{}) -> {degraded, #state{}}.
+-spec process_brickstatus_some_ok_fallback(atom(), now_status_list(), bricklist(), #state{}) -> {degraded, #state{}}.
 process_brickstatus_some_ok_fallback(_StateName, NewBricksStatus,
                                      OK_Bricks, S) ->
     B1 = whittle_chain_to_1(OK_Bricks, S),
@@ -1080,7 +1083,7 @@ figure_out_current_chain_op_status(OK_Bricks) ->
 %% state correctly).  So, use a separate proc to do the calculation so any
 %% table leaks will automatically be cleaned up.
 
--spec stitch_op_state(list(#opconf_r{})) -> {bricklist(), brick() | undefined}.
+-spec stitch_op_state(list(#opconf_r{})) -> {bricklist(), brick() | undefined} | no_return().
 stitch_op_state([OpC]) ->
     %% Sanity checking for a standalone brick.
     standalone = OpC#opconf_r.role,
@@ -1180,19 +1183,21 @@ stitch_op_state_3(OpCs) ->
 substitute_prop(PropList, Key, NewVal) ->
     lists:keyreplace(Key, 1, PropList, {Key, NewVal}).
 
--spec is_brick_x(new_internal_status()) -> fun((brick()) -> boolean()).
+-spec is_brick_x(now_internal_status() | last_internal_status())
+                -> fun((now_status() | last_status())
+                       -> boolean()).
 is_brick_x(Status) ->
     fun({_B, S}) when S == Status -> true;
        (_)                        -> false
     end.
 
--spec is_brick_unknown(brick()) -> boolean().
+-spec is_brick_unknown(now_status()) -> boolean().
 is_brick_unknown(B) -> (is_brick_x(unknown))(B).
 
--spec is_brick_pre_init(brick()) -> boolean().
+-spec is_brick_pre_init(now_status()) -> boolean().
 is_brick_pre_init(B) -> (is_brick_x(pre_init))(B).
 
--spec is_brick_ok(brick()) -> boolean().
+-spec is_brick_ok(now_status() | last_status()) -> boolean().
 is_brick_ok(B) -> (is_brick_x(ok))(B).
 
 -spec go_start_1chain_sync(brick()) -> ok.
@@ -1472,7 +1477,7 @@ set_all_chain_roles_reorder(ChainName, BrickList, OldBrickList, S) ->
     _ = gmt_loop:do_while(Fpoll, 0),
     ok.
 
--spec set_all_read_only(bricklist(), true | false) -> ok.
+-spec set_all_read_only(bricklist(), boolean()) -> ok.
 set_all_read_only(BrickList, Mode_p) when is_list(BrickList) ->
     [ok = brick_server:chain_set_read_only_mode(Brick, Node, Mode_p) ||
         {Brick, Node} <- BrickList],
@@ -1592,7 +1597,7 @@ poll_for_full_sync(Brick, Node, TimeLimit_0) ->
         Err                  -> Err
     end.
 
--spec backward_status_but_alive_p(last_internal_status(), new_internal_status()) -> boolean().
+-spec backward_status_but_alive_p(last_internal_status(), now_internal_status()) -> boolean().
 backward_status_but_alive_p(OldStatus, NewStatus) ->
     OldNum = status_to_num(OldStatus),
     NewNum = status_to_num(NewStatus),
@@ -1602,7 +1607,7 @@ backward_status_but_alive_p(OldStatus, NewStatus) ->
             false
     end.
 
--spec status_to_num(last_internal_status() | new_internal_status()) -> 0 | 10 | 20 | 30.
+-spec status_to_num(last_internal_status() | now_internal_status()) -> 0 | 10 | 20 | 30.
 status_to_num(pre_init)  -> 10;
 status_to_num(repairing) -> 20;
 status_to_num(ok)        -> 30;
@@ -1612,16 +1617,16 @@ list_uniq([X,X|Xs]) -> list_uniq([X|Xs]);
 list_uniq([X|Xs])   -> [X|list_uniq(Xs)];
 list_uniq([])       -> [].
 
-%% -spec state_to_proplist(#state{}) -> list({atom(), term()}).
+-spec state_to_proplist(#state{}) -> list({atom(), term()}).
 state_to_proplist(S) when is_record (S, state) ->
     [{Name,element(Pos, S)} || {Pos, Name} <- info_state_r()].
 
-%% -spec info_state_r() -> list({integer(), atom()}).
+-spec info_state_r() -> list({integer(), atom()}).
 info_state_r() ->
     Es = record_info(fields, state),
     lists:zip(lists:seq(2, length(Es) + 1), Es).
 
--spec check_difflist_for_disk_error(bricklist(), #state{}) -> ok.
+-spec check_difflist_for_disk_error(diff_status_list(), #state{}) -> ok.
 check_difflist_for_disk_error(DiffList, _S) ->
     lists:foreach(
       fun({{_Br, Nd} = Brick, {OldState, NewState}}) ->
