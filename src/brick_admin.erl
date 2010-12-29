@@ -1295,6 +1295,7 @@ schema_to_proplists(Schema) ->
 
 %% @doc Entry point for the bootstrap brick scan &amp; repair loop.
 
+-spec bootstrap_scan_loop() -> no_return().
 bootstrap_scan_loop() ->
     register(bootstrap_scan_loop,self()),
     bootstrap_scan_loop2().
@@ -1306,6 +1307,7 @@ bootstrap_scan_loop() ->
 %% a side-effect of the fetch being that any inconsistencies in the
 %% bricks will be fixed according to quorum agreement.
 
+-spec bootstrap_scan_loop2() -> no_return().
 bootstrap_scan_loop2() ->
     timer:sleep(4*1000),
     Bricks = get_schema_bricks(?MODULE),
