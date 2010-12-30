@@ -12,7 +12,7 @@
 %%% See the License for the specific language governing permissions and
 %%% limitations under the License.
 
--module(brick_ets_test).
+-module(brick_ets_tests).
 
 -compile(export_all).
 -include_lib("eunit/include/eunit.hrl").
@@ -47,7 +47,7 @@ all_tests_test_() ->
 test_setup() ->
     %% @TODO - boilerplate start
     os:cmd("rm -rf Schema.local hlog.* root"),
-    os:cmd("ln -s ../../gdss-admin/priv/root ."),
+    os:cmd("ln -s ../../gdss_admin/priv/root ."),
     os:cmd("epmd -kill; sleep 1"),
     os:cmd("epmd -daemon; sleep 1"),
     {ok, _} = net_kernel:start(['eunit@localhost', shortnames]),
