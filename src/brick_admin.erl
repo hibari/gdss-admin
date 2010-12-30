@@ -136,9 +136,6 @@
 -export([init/1, handle_call/3, handle_cast/2, handle_info/2,
          terminate/2, code_change/3]).
 
-%% Schema transformation
--export([upgrade_20090320/1, fix_gh_20090320/1]).
-
 %% Debugging
 -export([state/0]).
 
@@ -205,7 +202,7 @@
 -spec load_bootstrap_data(bricklist(),fun(({any(),any()})->boolean())) -> term().
 -spec make_chain_description(atom(),non_neg_integer(),[atom()]) -> [{atom(),any()}].
 -spec make_common_table_opts(proplist(),boolean(),char(),non_neg_integer(),chainlist()) -> proplist().
--spec schema_filename() -> file:name().
+-spec schema_filename() -> string().
 -spec spam_gh_to_all_nodes() -> ok.
 -spec spam_gh_to_all_nodes(pid()) -> ok.
 -spec start([file:name()]|file:name()) -> ok | error().
@@ -2535,66 +2532,6 @@ send_log_replay(Key, TS, Exp, Val, Flags, UpBrick, UpNode, NewBrick, NewNode) ->
     gen_server:cast({NewBrick, NewNode},
                     {ch_log_replay_v2, {UpBrick, UpNode}, Serial, [{insert, ST}],
                      <<>>, <<>>, lastserial_unused}).
-
-%%
-%% Schema upgrade items
-%%
-
--spec upgrade_20090320(list(atom() | list())) -> no_return().
-upgrade_20090320([A]) when is_atom(A) ->
-    case catch rpc:call(A, ?MODULE, fix_gh_20090320, [schema_filename()]) of
-        ok ->
-            io:format("Upgrade successful.\n"),
-            timer:sleep(250),
-            erlang:halt(0);
-        Err ->
-            io:format("Upgrade error: ~p\n", [Err]),
-            timer:sleep(250),
-            erlang:halt(1)
-    end;
-upgrade_20090320([L]) when is_list(L) ->
-    upgrade_20090320([list_to_atom(L)]).
-
-%% @doc Example of GH schema upgrade function.
-
-fix_gh_20090320(File) ->
-    BrickList = get_bricklist_from_disk(File),
-    {ok, TS, Schema} = squorum_get(BrickList, ?BKEY_SCHEMA_DEFINITION),
-    Tables = [Tab || {Tab, _} <- dict:to_list(Schema#schema_r.tabdefs)],
-    Schema2 = lists:foldl(
-                fun(Tab, Sch) ->
-                        {ok, T} = dict:find(Tab, Sch#schema_r.tabdefs),
-                        GH = T#table_r.ghash,
-                        CurLH2 = fix_lh_20090320(GH#g_hash_r.current_h_desc),
-                        NewLH2 = fix_lh_20090320(GH#g_hash_r.new_h_desc),
-                        GH2 = GH#g_hash_r{current_h_desc = CurLH2,
-                                          new_h_desc     = NewLH2},
-                        update_tab_ghash(Tab, T, GH2, Sch)
-                end, Schema, Tables),
-    ok = brick_squorum:set(BrickList, term_to_binary(?BKEY_SCHEMA_DEFINITION),
-                           term_to_binary(Schema2), 0, [{testset, TS}], 5000).
-
-%% @doc Example of LH schema upgrade function.
-
-fix_lh_20090320(#hash_r{opaque = Opaque} = LH)
-  when element(1, Opaque) == var_prefix,
-       size(Opaque) == 4 ->
-    %% num_separators added @ element 5, default = 2
-    Opaque2 = list_to_tuple(tuple_to_list(Opaque) ++ [2]),
-    io:format("Upgrade var_prefix\n"),
-    LH#hash_r{opaque = Opaque2};
-fix_lh_20090320(#hash_r{opaque = Opaque} = LH)
-  when element(1, Opaque) == chash,
-       size(Opaque) == 12 ->
-    %% num_separators added @ element 6, default = 2
-    L = tuple_to_list(Opaque),
-    Opaque2 = list_to_tuple(lists:sublist(L, 1, 5) ++ [2] ++
-                            lists:sublist(L, 6, 12)),
-    io:format("Upgrade chash\n"),
-    LH#hash_r{opaque = Opaque2};
-fix_lh_20090320(LH) ->
-    io:format("Pass-through\n"),
-    LH.
 
 %% @type bigdata_option()    = {'bigdata_dir', string()}.
 %% @type brick()             = {logical_brick(), node()}.
