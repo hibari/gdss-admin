@@ -202,7 +202,7 @@
 -spec load_bootstrap_data(bricklist(),fun(({any(),any()})->boolean())) -> term().
 -spec make_chain_description(atom(),non_neg_integer(),[atom()]) -> [{atom(),any()}].
 -spec make_common_table_opts(proplist(),boolean(),char(),non_neg_integer(),chainlist()) -> proplist().
--spec schema_filename() -> string().
+-spec schema_filename() -> nonempty_string().
 -spec spam_gh_to_all_nodes() -> ok.
 -spec spam_gh_to_all_nodes(pid()) -> ok.
 -spec start([file:name()]|file:name()) -> ok | error().
