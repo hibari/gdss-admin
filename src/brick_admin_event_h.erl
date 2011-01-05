@@ -105,9 +105,10 @@ handle_event({beacon_event, FromAddr, FromPort, B}, State)
                     ?ELOG_WARNING("Duplicate Admin Server: ~p ~p ~p",
                                   [FromAddr, FromPort, B]),
                     timer:sleep(1),             % log to flushes to disk?
-                    spawn(fun() -> application:stop(gdss),
-                                   timer:sleep(200),
-                                   erlang:halt() end)
+                    _ = spawn(fun() -> _ = application:stop(gdss),
+                                       timer:sleep(200),
+                                       erlang:halt() end),
+                    ok
             end;
         _Other ->
             ?ELOG_ERROR("bad beacon: ~p ~p ~p",

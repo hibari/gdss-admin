@@ -211,7 +211,7 @@
 -spec start_brick_only(atom(),node(),proplist()) -> ok.
 -spec stop_brick_only(brick()) -> ok.
 -spec stop_brick_only(atom(),node()) -> ok.
--spec table_finished_migration(atom()) -> {table_finished_migration,any()}.
+-spec table_finished_migration(atom()) -> ok.
 
 
 %% @doc Start the admin server underneath the brick_sup supervisor.
@@ -234,13 +234,13 @@ start(BootstrapFile)
             ChildSpec1 =
                 {brick_sb, {brick_sb, start_link, []},
                  permanent, 2000, worker, [brick_sb]},
-            supervisor:start_child(brick_admin_sup, ChildSpec1),
+            {ok, _} = supervisor:start_child(brick_admin_sup, ChildSpec1),
 
             %% Start ourself.
             ChildSpec2 =
                 {brick_admin, {brick_admin, start_er_up, [BootstrapFile]},
                  permanent, 2000, worker, [brick_admin]},
-            supervisor:start_child(brick_admin_sup, ChildSpec2),
+            {ok, _} = supervisor:start_child(brick_admin_sup, ChildSpec2),
 
             timer:sleep(5000),
             case whereis(brick_admin) of undefined -> error;
@@ -309,7 +309,7 @@ start(normal, Args) ->
 
     case brick_admin_sup:start_link() of
         {ok, _Pid}=Ok ->
-            brick_admin:start(schema_filename()),
+            _ = brick_admin:start(schema_filename()),
             Ok;
         Error ->
             Error
@@ -550,7 +550,8 @@ rsync_brick_to_brick(SrcBrNd, DstBrNd) ->
 %% @doc Notify the Admin Server that a data migration has finished successfully.
 
 table_finished_migration(TableName) ->
-    ?MODULE ! {table_finished_migration, TableName}.
+    ?MODULE ! {table_finished_migration, TableName},
+    ok.
 
 %% @doc NOTE: The caller is responsible for making certain that the
 %% Nodes list does not contain adjacent machines.
@@ -628,12 +629,13 @@ hack_all_tab_setup(TableName, ChainLength, Nodes, BrickOptions, DoCreateAdd,
     AllBricks = [B || {_, Bs} <- ChDescr, B <- Bs],
     %% Give some time for pingers to get their bricks running.
     timer:sleep(5000),
-    [_ = brick_server:chain_hack_set_global_hash(Br, Nd, GH) ||
-        {Br, Nd} <- AllBricks],
+    _ = [_ = brick_server:chain_hack_set_global_hash(Br, Nd, GH)
+         || {Br, Nd} <- AllBricks],
     timer:sleep(1000),
     %% Note: could use multicall here, but this whole func is a kludge.
     %% Consider using multicall elsewhere.
-    [catch brick_simple:set_gh(Nd, TableName, GH) || Nd <- [node()|nodes()]],
+    _ = [catch brick_simple:set_gh(Nd, TableName, GH)
+         || Nd <- [node()|nodes()]],
     ok.
 
 %% @doc "Spam" all connected nodes with the GH (global hash) for all tables.
@@ -788,7 +790,7 @@ handle_info({finish_init_tasks, BootstrapFile}, State) ->
     %% as a quick kludge.
     %% NOTE: Do not use bootstrap_existing_schema() here, r-o ops only!
     DiskBrickList = get_bricklist_from_disk(BootstrapFile),
-    [spawn(fun() -> net_adm:ping(Nd) end)|| {_, Nd} <- DiskBrickList],
+    _ = [spawn(fun() -> net_adm:ping(Nd) end) || {_, Nd} <- DiskBrickList],
     timer:sleep(1000),
 
     {ok, MboxHigh} = application:get_env(gdss_admin, brick_admin_mbox_high_water),
@@ -838,7 +840,7 @@ handle_info({finish_init_tasks, BootstrapFile}, State) ->
     %% Update on-disk schema location hints, if needed.
     if DiskBrickList2 /= Schema#schema_r.schema_bricklist ->
             OldFile = BootstrapFile ++ integer_to_list(gmt_time:time_t()),
-            file:rename(BootstrapFile, OldFile),
+            ok = file:rename(BootstrapFile, OldFile),
             ok = write_schema_bootstrap_file(BootstrapFile, Schema#schema_r.schema_bricklist),
             %% After repairing, we should restart to ensure proper quorum available
             exit({restarting, repaired_hint_file, BootstrapFile});
@@ -882,8 +884,8 @@ handle_info({finish_init_tasks, BootstrapFile}, State) ->
 
     %% HACK: Send a reminder to ourselves to set up the
     %% brick_simple stuff.
-    timer:apply_after( 1*1000, ?MODULE, spam_gh_to_all_nodes, [self()]),
-    timer:apply_after(10*1000, ?MODULE, spam_gh_to_all_nodes, [self()]),
+    {ok, _} = timer:apply_after( 1*1000, ?MODULE, spam_gh_to_all_nodes, [self()]),
+    {ok, _} = timer:apply_after(10*1000, ?MODULE, spam_gh_to_all_nodes, [self()]),
     brick_itimer:send_interval(5*1000, restart_pingers_and_chmons),
 
     %% Start client monitor processes (must be done async/after our init())
@@ -898,7 +900,7 @@ handle_info({do_spam_gh_to_all_nodes, TableName} = Msg, State) ->
                                 after 0     -> {false, x}
                                 end
                       end, x),
-    do_spam_gh_to_all_nodes(State, TableName),
+    ok = do_spam_gh_to_all_nodes(State, TableName),
     {noreply, State};
 handle_info({table_finished_migration, TableName} = Msg, State) ->
     gmt_loop:do_while(fun(_) -> receive Msg -> {true, x}
@@ -944,7 +946,7 @@ code_change(_OldVsn, State, _Extra) ->
 
 start_pingers_and_chmons(Schema) ->
     brick_bp:start_pingers(Schema#schema_r.schema_bricklist, []),
-    lists:map(
+    lists:foreach(
       fun({_TableName, Props}) ->
               BrickOptions = proplists:get_value(brick_options, Props, []),
               GH = proplists:get_value(ghash, Props),
@@ -959,9 +961,10 @@ start_pingers_and_chmons(Schema) ->
               AllBricks = [B || {_ChainName,Bricks} <- AllChains, B <- Bricks],
               %%io:format("ZZZ: AllChains = ~p", [AllChains]),
               %%io:format("ZZZ: AllBricks = ~p", [AllBricks]),%erlang:halt(),
-              [ok = brick_chainmon:start_mon(C) || C <- lists:usort(AllChains)],
+              _ = [ok = brick_chainmon:start_mon(C) || C <- lists:usort(AllChains)],
               ok = brick_bp:start_pingers(lists:usort(AllBricks), BrickOptions)
-      end, schema_to_proplists(Schema)).
+      end, schema_to_proplists(Schema)),
+    ok.
 
 %% @doc Asynchronously start all brick pinger and chain monitor processes.
 
@@ -979,7 +982,7 @@ bootstrap_existing_schema(File) ->
 bootstrap_existing_schema2(BrickList) ->
     %% Get schema-storing nodes running, as many as possible.
     %% We don't care if we encounter most errors.
-    [catch start_standalone_brick(Brick) || Brick <- BrickList],
+    _ = [catch start_standalone_brick(Brick) || Brick <- BrickList],
 
     {ok, _TS, Schema} = squorum_get(BrickList, ?BKEY_SCHEMA_DEFINITION),
     {BrickList, Schema}.
@@ -1283,7 +1286,7 @@ write_schema_bootstrap_file(File, BrickList) ->
               "%% Written on: ~p ~p\n",
               [date(), time()]),
     io:format(FH, "~p.\n", [BrickList]),
-    file:close(FH),
+    ok = file:close(FH),
     ok.
 
 %% @doc Convert the elements of a #schema record to a proplist.
@@ -1319,31 +1322,31 @@ bootstrap_scan_loop2() ->
                        %% should be 100% safety wrt logging & disk sync,
                        %% so theory says no brick options are necessary here.
                        %% However, will that always be true?
-                       [_ = (catch start_brick_only(B)) || B <- Bricks],
-                       [_ = begin
-                                (catch brick_server:chain_set_my_repair_state(
-                                         Br, Nd, ok)),
-                                (catch brick_server:chain_role_standalone(
-                                         Br, Nd))
-                            end || {Br, Nd} <- Bricks],
+                       _ = [_ = (catch start_brick_only(B)) || B <- Bricks],
+                       _ = [_ = begin
+                                    (catch brick_server:chain_set_my_repair_state(
+                                             Br, Nd, ok)),
+                                    (catch brick_server:chain_role_standalone(
+                                             Br, Nd))
+                                end || {Br, Nd} <- Bricks],
                        unlink(Self),
                        exit(normal)
                end),
-    case catch get_all_bootstrap_keys(Bricks) of
-        {'EXIT', _} ->
-            noop;
-        AllKeys ->
-            %% If there was a delete happening in the middle of the
-            %% get_all_bootstrap_keys() gathering process, then the
-            %% passage of a bit of time will help us avoid most of the
-            %% racing with the delete, and thus lower the chance that
-            %% we'll re-create a deleted key.  We don't need the
-            %% chance to be zero, because the 'schema_definition' key
-            %% isn't deleted, it's only replaced, and our most crucial
-            %% info is stored with that key.
-            timer:sleep(1000),
-            [_ = squorum_get(Bricks, K) || K <- AllKeys]
-    end,
+    _ = case (catch get_all_bootstrap_keys(Bricks)) of
+            {'EXIT', _} ->
+                noop;
+            AllKeys when is_list(AllKeys) ->
+                %% If there was a delete happening in the middle of the
+                %% get_all_bootstrap_keys() gathering process, then the
+                %% passage of a bit of time will help us avoid most of the
+                %% racing with the delete, and thus lower the chance that
+                %% we'll re-create a deleted key.  We don't need the
+                %% chance to be zero, because the 'schema_definition' key
+                %% isn't deleted, it's only replaced, and our most crucial
+                %% info is stored with that key.
+                timer:sleep(1000),
+                [_ = squorum_get(Bricks, K) || K <- AllKeys]
+        end,
     ?MODULE:bootstrap_scan_loop2().
 
 %% @doc Get all bootstrap keys (to assist scan &amp; repair loop).
@@ -1431,11 +1434,11 @@ do_add_bootstrap_copy(BrickList, State) ->
         false ->
             NewSchema = OldSchema#schema_r{schema_bricklist=NewBootList},
             %% start new bootstrap bricks.
-            [catch start_standalone_brick(Brick) || Brick <- BrickList],
+            _ = [catch start_standalone_brick(Brick) || Brick <- BrickList],
             %% Update the schema hint file
             BootstrapFile = schema_filename(),
             OldFile = BootstrapFile ++ integer_to_list(gmt_time:time_t()),
-            file:rename(BootstrapFile, OldFile),
+            ok = file:rename(BootstrapFile, OldFile),
             ok = write_schema_bootstrap_file(BootstrapFile, NewBootList),
             %% Save the schema to the combined new bricklist quorum
             ok = squorum_set(NewSchema#schema_r.schema_bricklist, ?BKEY_SCHEMA_DEFINITION, NewSchema),
@@ -1494,7 +1497,8 @@ do_spam_gh_to_all_nodes(S, DesiredTableName) ->
                                          || Nd <- [node()|nodes()]]
                                end] ++ Acc
                      end, [], TabDefs),
-    [spawn_opt(F, [{priority, high}]) || F <- Fs].
+    _ = [spawn_opt(F, [{priority, high}]) || F <- Fs],
+    ok.
 
 %% @doc Try to find the global hash record associated with a chain.
 
@@ -1620,12 +1624,12 @@ do_change_chain_length(ChainName, NewBrickList, S) ->
                     _ = start_pingers_and_chmons(NewSchema),
                     timer:sleep(1*1000),        % TODO: figure out necessity
                     ?ELOG_INFO("OldOnlyBricks = ~p", [OldOnlyBricks]),
-                    [spawn(fun() ->
-                                   %% Give monitors time to die & restart.
-                                   timer:sleep(2*1000), % TODO: figure out necessity
-                                   ok = stop_bp(Br, Nd),
-                                   _ = stop_brick_del_history(Br, Nd)
-                           end) || {Br, Nd} <- OldOnlyBricks],
+                    _ = [spawn(fun() ->
+                                       %% Give monitors time to die & restart.
+                                       timer:sleep(2*1000), % TODO: figure out necessity
+                                       ok = stop_bp(Br, Nd),
+                                       _ = stop_brick_del_history(Br, Nd)
+                               end) || {Br, Nd} <- OldOnlyBricks],
                     {ok, NewS}
                 end
             catch
@@ -1657,7 +1661,7 @@ do_start_migration(TableName, NewLH, Options, S) ->
             NewChNames = [Ch || {Ch, _} <- NewChainList],
             BothChNames = ordsets:intersection(ordsets:from_list(CurChNames),
                                                ordsets:from_list(NewChNames)),
-            lists:map(
+            lists:foreach(
               fun(ChName) ->
                       CurBrs = proplists:get_value(ChName, CurChainList),
                       NewBrs = proplists:get_value(ChName, NewChainList),
@@ -1788,8 +1792,8 @@ do_table_finished_migration_cleanup(TableName, OldOnlyChNames, OldOnlyBricks,
     ParentPid = self(),
     spawn(fun() ->
                   timer:sleep(2*1000),
-                  [(catch brick_server:migration_clear_sweep(
-                            Br, Nd)) || {Br, Nd} <- AllBricks],
+                  _ = [(catch brick_server:migration_clear_sweep(
+                                Br, Nd)) || {Br, Nd} <- AllBricks],
                   stop_old_chains_and_bricks(
                     OldOnlyChNames, OldOnlyBricks),
                   ParentPid ! {clear_migmon_pid, TableName},
@@ -1810,13 +1814,13 @@ update_tab_ghash(TableName, T, NewGH, Schema) ->
 stop_old_chains_and_bricks(OldOnlyChNames, OldOnlyBricks) ->
     ?ELOG_INFO("migration cleanup: old chains: ~p",
                [OldOnlyChNames]),
-    [ok = stop_chmon(Ch) || Ch <- OldOnlyChNames],
-    [_ = (catch brick_sb:delete_chain_history(Ch)) || Ch <- OldOnlyChNames],
+    _ = [ok = stop_chmon(Ch) || Ch <- OldOnlyChNames],
+    _ = [_ = (catch brick_sb:delete_chain_history(Ch)) || Ch <- OldOnlyChNames],
     ?ELOG_INFO("migration cleanup: old bricks: ~p",
                [OldOnlyBricks]),
-    [_ = (catch stop_bp(Br, Nd)) || {Br, Nd} <- OldOnlyBricks],
+    _ = [_ = (catch stop_bp(Br, Nd)) || {Br, Nd} <- OldOnlyBricks],
     timer:sleep(1*1000),
-    [_ = (catch stop_brick_del_history(Br, Nd)) || {Br, Nd} <- OldOnlyBricks],
+    _ = [_ = (catch stop_brick_del_history(Br, Nd)) || {Br, Nd} <- OldOnlyBricks],
     ok.
 
 %% @doc Stop a chain monitor process.
@@ -2048,7 +2052,7 @@ bootstrap1(Schema, DataProps, VarPrefixP, PrefixSep, NumSep, NodeList,
     BootsNodes = [{list_to_atom("bootstrap_copy" ++ integer_to_list(N)) , Nd}
                   || {N, Nd} <- NsNds],
     {ok, _} = brick_admin:create_new_schema(BootsNodes, Schema),
-    brick_admin:start(Schema),
+    ok = brick_admin:start(Schema),
     timer:sleep(1000),
 
     Table = ?S3_TABLE,
@@ -2099,16 +2103,16 @@ do_delete_client_monitor(Node) ->
     Res = do_mod_client_monitor(Node, fun(Nd, OldList) -> OldList -- [Nd] end),
     ?ELOG_INFO("Deleting client monitors for node ~p: ~p",
                [Node, Res]),
-    [begin
-         Name = client_monitor_name(Node, AppName),
-         case (catch supervisor:terminate_child(brick_mon_sup, Name)) of
-             ok ->
-                 gmt_util:clear_alarm({client_node_down, Node}, fun() -> ok end),
-                 catch supervisor:delete_child(brick_mon_sup, Name);
-             Err ->
-                 Err
-         end
-     end || AppName <- client_mon_app_names()],
+    _ = [begin
+             Name = client_monitor_name(Node, AppName),
+             case (catch supervisor:terminate_child(brick_mon_sup, Name)) of
+                 ok ->
+                     gmt_util:clear_alarm({client_node_down, Node}, fun() -> ok end),
+                     catch supervisor:delete_child(brick_mon_sup, Name);
+                 Err ->
+                     Err
+             end
+         end || AppName <- client_mon_app_names()],
     Res.
 
 client_mon_app_names() ->
@@ -2401,21 +2405,21 @@ fast_sync_scav(StartNode, UpBrick, UpNode, NewBrick, NewNode, Opts) ->
                log_fun = fun(Fmt, Args) -> ?ELOG_INFO(Fmt, Args) end,
                phase10_fun = fun fast_sync_bottom10/7},
     Fdoit = fun() ->
-                    [rpc:call(Nd, error_logger, info_msg,
-                              ["Fast sync by ~p starting for ~p ~p -> ~p ~p\n",
-                               [self(), UpBrick, UpNode, NewBrick, NewNode]]) ||
-                        Nd <- lists:usort([StartNode, UpNode, NewNode])],
+                    _ = [rpc:call(Nd, error_logger, info_msg,
+                                  ["Fast sync by ~p starting for ~p ~p -> ~p ~p\n",
+                                   [self(), UpBrick, UpNode, NewBrick, NewNode]]) ||
+                            Nd <- lists:usort([StartNode, UpNode, NewNode])],
                     put(throttle_bytes_hack, ThrottleBytes),
-                    gmt_hlog_common:scavenger_commonlog(SA),
-                    [rpc:call(Nd, error_logger, info_msg,
-                              ["Fast sync by ~p finished for ~p ~p -> ~p ~p\n",
-                               [self(), UpBrick, UpNode, NewBrick, NewNode]]) ||
-                        Nd <- lists:usort([StartNode, UpNode, NewNode])],
-                    if StopNewBrick_p ->
-                            brick_shepherd:stop_brick(NewBrick, NewNode);
-                       true ->
-                            ok
-                    end,
+                    _ = gmt_hlog_common:scavenger_commonlog(SA),
+                    _ = [rpc:call(Nd, error_logger, info_msg,
+                                  ["Fast sync by ~p finished for ~p ~p -> ~p ~p\n",
+                                   [self(), UpBrick, UpNode, NewBrick, NewNode]]) ||
+                            Nd <- lists:usort([StartNode, UpNode, NewNode])],
+                    _ = if StopNewBrick_p ->
+                                brick_shepherd:stop_brick(NewBrick, NewNode);
+                           true ->
+                                ok
+                        end,
                     exit(normal)
             end,
     Pid = spawn(Fdoit),
@@ -2450,7 +2454,7 @@ fast_sync_bottom10(SA, Finfolog, TempDir, TmpList4, _Bytes1,
              "\tOptions: ~p\n"
              "\tCopied: hunks bytes errs = ~p ~p ~p",
              [OptsNoDead, Hunks, Bytes, Errs]),
-    os:cmd("rm -rf " ++ TempDir),
+    _ = os:cmd("rm -rf " ++ TempDir),
     normal.
 
 %% @doc Set up the disk_log machinery to iterate over it via
@@ -2471,8 +2475,8 @@ fast_sync_one_seq_file_fun(TempDir, SA, ____Fread_blob, Finfolog,
             {Hunks, Bytes, Errs, _, _} =
                 brick_ets:disk_log_fold(
                   Fread_and_send, {0, 0, 0, SA#scav.throttle_pid, 0}, DInLog),
-            file:close(FH),
-            disk_log:close(DInLog),
+            ok = file:close(FH),
+            ok = disk_log:close(DInLog),
             Finfolog("fast sync: Finished sequence ~p", [SeqNum]),
             {Hs + Hunks, Bs + Bytes, Es + Errs}
     end.

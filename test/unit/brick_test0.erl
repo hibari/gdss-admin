@@ -3903,7 +3903,7 @@ put_rand_keys_via_simple(Tab, MaxKey, Num, KeyPrefix, KeySuffix, ValLen,
          Parent = self(),
          F = fun() ->
                      {A, B, C} = now(),
-                     random:seed(A, B, C),
+                     _ = random:seed(A, B, C),
                      RandL = integer_to_list(random:uniform(MaxKey)),
                      Key = gmt_util:bin_ify(KeyPrefix ++ RandL ++ KeySuffix),
                      case brick_simple:set(Tab, Key, Val, 60*1000) of

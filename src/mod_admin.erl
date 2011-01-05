@@ -993,13 +993,13 @@ get_bootstrap(Query, ModData) ->
         end,
         {ok, BtFile} = file:read_file(LocalBtFile),
         MyNode = node(),
-        [begin spawn(Nd, fun() -> file:write_file(LocalBtFile, BtFile),
-                                  ?ELOG_INFO("Schema hint file ~s copied from ~p",
-                                             [LocalBtFile, MyNode]), timer:sleep(200)
-                         end),
-               ?ELOG_INFO("Schema hint file ~s copied to ~p",
-                          [LocalBtFile, Nd])
-         end || Nd <- Boots],
+         _ = [begin spawn(Nd, fun() -> ok = file:write_file(LocalBtFile, BtFile),
+                                       ?ELOG_INFO("Schema hint file ~s copied from ~p",
+                                                  [LocalBtFile, MyNode]), timer:sleep(200)
+                              end),
+                    ?ELOG_INFO("Schema hint file ~s copied to ~p",
+                               [LocalBtFile, Nd])
+              end || Nd <- Boots],
         Head = [
                 <<"<html>\r\n">>,
                 <<"  <head><link rel='stylesheet' type='text/css' href='/css/admin.css' /><title>Bootstrap was successful</title><meta http-equiv='REFRESH' content='5;url=/' /></head>\r\n">>,

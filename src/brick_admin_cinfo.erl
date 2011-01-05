@@ -72,14 +72,14 @@ bootstrap_config(C) ->
 history_dump(C) ->
     Tmp = lists:flatten(io_lib:format("/tmp/history.~p", [now()])),
     Res = try
-              mod_admin:dump_history(Tmp),
+              ok = mod_admin:dump_history(Tmp),
               {ok, Out} = file:read_file(Tmp),
               Out
           catch X:Y ->
                   io_lib:format("Error ~p ~p at ~p\n",
                                 [X, Y, erlang:get_stacktrace()])
           after
-              file:delete(Tmp)
+              ok = file:delete(Tmp)
           end,
     cluster_info:send(C, Res).
 

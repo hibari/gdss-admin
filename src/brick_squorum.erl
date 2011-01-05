@@ -326,48 +326,48 @@ strict_quorum_answer_get(MultiCallRes, Servers, Op) ->
             BadBrick = hd(NonConformingBricks),
             {value, {BadBrick, BadAnswer}} = lists:keysearch(BadBrick, 1, Rs),
             {BadBr, BadNd} = BadBrick,
-            case Answer of
-                {ok, TS, Val} ->                % This key should exist
-                    FixOp = case BadAnswer of
-                                {ok, BadTS, _} when BadTS > TS ->
-                                    %% Minority has newer timestamp: an update
-                                    %% was interrupted somehow.
-                                    ?SINGLE:delete(BadBr, BadNd, Key,
-                                                   [{testset, BadTS}]),
-                                    ?SINGLE:make_op6(add, Key, TS, Val, 0, []);
-                                {ok, BadTS, _} ->
-                                    ?SINGLE:make_op6(replace, Key, TS, Val, 0,
-                                                     [{testset, BadTS}]);
-                                key_not_exist ->
-                                    ?SINGLE:make_op6(add, Key, TS, Val, 0, []);
-                                Res1 ->
-                                    throw({quorum_error1, Res1})
-                            end,
-                    %%?DBG(element(3, FixOp)),
-                    %%?DBG(element(6, FixOp)),
-                    %%?DBG({BadBr, BadNd}),
-                    %%?DBG(?SINGLE:do(BadBr, BadNd, [FixOp])),
-                    ?SINGLE:do(BadBr, BadNd, [FixOp]);
-                key_not_exist ->                % This key should be deleted
-                    FixOp = case BadAnswer of
-                                {ok, BadTS, _} ->
-                                    ?SINGLE:make_delete(Key,
-                                                        [{testset, BadTS}]);
-                                %%                              key_not_exist ->
-                                %%                                  %% This is the correct answer.
-                                Res2 ->
-                                    throw({quorum_error2, Res2})
-                            end,
-                    %%?DBG(FixOp),
-                    ?SINGLE:do(BadBr, BadNd, [FixOp]);
-                Res ->
-                    %% Don't throw an error here: we may have had something
-                    %% happen like catching a brick that's in state or role
-                    %% transition.
-                    ?ELOG_INFO("quorum get.3: ~p: ~p",
-                               [BadBrick, Res]),
-                    timer:sleep(250)
-            end,
+            _ = case Answer of
+                    {ok, TS, Val} ->                % This key should exist
+                        FixOp = case BadAnswer of
+                                    {ok, BadTS, _} when BadTS > TS ->
+                                        %% Minority has newer timestamp: an update
+                                        %% was interrupted somehow.
+                                        _ = ?SINGLE:delete(BadBr, BadNd, Key,
+                                                           [{testset, BadTS}]),
+                                        ?SINGLE:make_op6(add, Key, TS, Val, 0, []);
+                                    {ok, BadTS, _} ->
+                                        ?SINGLE:make_op6(replace, Key, TS, Val, 0,
+                                                         [{testset, BadTS}]);
+                                    key_not_exist ->
+                                        ?SINGLE:make_op6(add, Key, TS, Val, 0, []);
+                                    Res1 ->
+                                        throw({quorum_error1, Res1})
+                                end,
+                        %%?DBG(element(3, FixOp)),
+                        %%?DBG(element(6, FixOp)),
+                        %%?DBG({BadBr, BadNd}),
+                        %%?DBG(?SINGLE:do(BadBr, BadNd, [FixOp])),
+                        ?SINGLE:do(BadBr, BadNd, [FixOp]);
+                    key_not_exist ->                % This key should be deleted
+                        FixOp = case BadAnswer of
+                                    {ok, BadTS, _} ->
+                                        ?SINGLE:make_delete(Key,
+                                                            [{testset, BadTS}]);
+                                    %%                              key_not_exist ->
+                                    %%                                  %% This is the correct answer.
+                                    Res2 ->
+                                        throw({quorum_error2, Res2})
+                                end,
+                        %%?DBG(FixOp),
+                        ?SINGLE:do(BadBr, BadNd, [FixOp]);
+                    Res ->
+                        %% Don't throw an error here: we may have had something
+                        %% happen like catching a brick that's in state or role
+                        %% transition.
+                        ?ELOG_INFO("quorum get.3: ~p: ~p",
+                                   [BadBrick, Res]),
+                        timer:sleep(250)
+                end,
             re_submit;
        Count >= MinQuorum ->
             Answer;
@@ -436,25 +436,25 @@ t0() ->
     Rs3d = [{h1, err}, {h2, err}, {h3, err}],
     Times = lists:seq(1,100),
 
-    [{0, error} = popular_answer(shuffle(Rs0), []) || _ <- Times],
+    _ = [{0, error} = popular_answer(shuffle(Rs0), []) || _ <- Times],
 
-    [{1, ok} = popular_answer(shuffle(Rs1), []) || _ <- Times],
+    _ = [{1, ok} = popular_answer(shuffle(Rs1), []) || _ <- Times],
 
     %% Special case of QSize = 2
-    [{2, {ok, foo}} = popular_answer(shuffle(Rs2a), []) || _ <- Times],
-    [{2, {ok, foo}} = popular_answer(shuffle(Rs2b), []) || _ <- Times],
-    [{2, key_not_exist} = popular_answer(shuffle(Rs2c), []) || _ <- Times],
+    _ = [{2, {ok, foo}} = popular_answer(shuffle(Rs2a), []) || _ <- Times],
+    _ = [{2, {ok, foo}} = popular_answer(shuffle(Rs2b), []) || _ <- Times],
+    _ = [{2, key_not_exist} = popular_answer(shuffle(Rs2c), []) || _ <- Times],
     %% These are not really QSize = 2, they're paranoid tests of non-empty
     %% failed node list (for total = 3).
     H3 = {h3, timeout},
-    [{2, {ok, foo}} = popular_answer(shuffle(Rs2a), [H3]) || _ <- Times],
-    [{1, {ok, foo}} = popular_answer(shuffle(Rs2b), [H3]) || _ <- Times],
-    [{2, key_not_exist} = popular_answer(shuffle(Rs2c), [H3]) || _ <- Times],
+    _ = [{2, {ok, foo}} = popular_answer(shuffle(Rs2a), [H3]) || _ <- Times],
+    _ = [{1, {ok, foo}} = popular_answer(shuffle(Rs2b), [H3]) || _ <- Times],
+    _ = [{2, key_not_exist} = popular_answer(shuffle(Rs2c), [H3]) || _ <- Times],
 
-    [{3, ok} = popular_answer(shuffle(Rs3a), []) || _ <- Times],
-    [{2, ok} = popular_answer(shuffle(Rs3b), []) || _ <- Times],
-    [{2, err} = popular_answer(shuffle(Rs3c), []) || _ <- Times],
-    [{3, err} = popular_answer(shuffle(Rs3d), []) || _ <- Times],
+    _ = [{3, ok} = popular_answer(shuffle(Rs3a), []) || _ <- Times],
+    _ = [{2, ok} = popular_answer(shuffle(Rs3b), []) || _ <- Times],
+    _ = [{2, err} = popular_answer(shuffle(Rs3c), []) || _ <- Times],
+    _ = [{3, err} = popular_answer(shuffle(Rs3d), []) || _ <- Times],
 
     ok.
 

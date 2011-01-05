@@ -214,7 +214,7 @@ state(ServerRef) ->
 %%--------------------------------------------------------------------
 init([Chain, Bricks]) ->
     self() ! finish_init_tasks,
-    random:seed(now()),
+    _ = random:seed(now()),
     {ok, Time} = application:get_env(gdss_admin, admin_server_chain_poll),
     {ok, TRef} = brick_itimer:send_interval(Time, check_status),
     SBPid = brick_sb:sb_pid(),
@@ -766,7 +766,7 @@ process_brickstatus_diffs(healthy = _StateName, DiffList, LastBricksStatus,
                     "brick = ~p\n", [S#state.chain, DownBricks,RepairingBrick]),
             {R_Br, R_Nd} = RepairingBrick,
             %% Force repair to start over again (in later poll cycle).
-            brick_server:chain_set_my_repair_state(R_Br, R_Nd, pre_init);
+            ok = brick_server:chain_set_my_repair_state(R_Br, R_Nd, pre_init);
         _ ->
             ok
     end,
@@ -1126,7 +1126,7 @@ stitch_op_state_3(OpCs) ->
 
     DownG = digraph:new(),
     UpG = digraph:new(),
-    lists:map(
+    lists:foreach(
       fun(OpC) ->
               if OpC#opconf_r.downstream /= undefined ->
                       digraph:add_vertex(DownG, OpC#opconf_r.me),
@@ -1278,7 +1278,7 @@ do_unknown_timeout_decision(S) when is_record(S, state) ->
 whittle_chain_to_1(OK_Bricks, S) ->
     {Brick, Node} = B1 = hd(OK_Bricks),
     Other_OK_Bricks = tl(OK_Bricks),
-    [_ = (catch brick_admin:stop_brick_only(B)) || B <- lists:reverse(Other_OK_Bricks)],
+    _ = [_ = (catch brick_admin:stop_brick_only(B)) || B <- lists:reverse(Other_OK_Bricks)],
     ok = set_all_chain_roles([{Brick, Node}], S),
     B1.
 
@@ -1323,7 +1323,7 @@ set_all_chain_roles(BrickList, OldBrickList, S) ->
             ?DBG_CHAINx({set_all_chain_roles, S#state.chain, read_only, 2}),
             ok = set_all_read_only(OldBrickList, true),
             ?E_INFO("set_all_chain_roles: ~p: brick read-only 2\n", [S#state.chain]),
-            lists:map(
+            lists:foreach(
               fun({Br, Nd}) ->
                       %%?E_WARNING("ZZZ: ~p: call poll_for_full_sync(~p, ~p) for 2sec\n", [S#state.chain, Br, Nd]),
                       %%?E_WARNING("ZZZ: ~p: OldBrickList ~p\n", [S#state.chain, OldBrickList]),
@@ -1338,7 +1338,8 @@ set_all_chain_roles(BrickList, OldBrickList, S) ->
                                  [Br, Nd, Res]),
                               exit({poll_for_full_sync, Br, Nd, Res})
                       end
-              end, OldBrickList);
+              end, OldBrickList),
+            ok;
        true ->
             ok
     end,
@@ -1479,8 +1480,8 @@ set_all_chain_roles_reorder(ChainName, BrickList, OldBrickList, S) ->
 
 -spec set_all_read_only(bricklist(), boolean()) -> ok.
 set_all_read_only(BrickList, Mode_p) when is_list(BrickList) ->
-    [ok = brick_server:chain_set_read_only_mode(Brick, Node, Mode_p) ||
-        {Brick, Node} <- BrickList],
+    _ = [ok = brick_server:chain_set_read_only_mode(Brick, Node, Mode_p) ||
+            {Brick, Node} <- BrickList],
     ok.
 
 -spec add_repair_brick_to_end(brick(), #state{}) -> ok.

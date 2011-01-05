@@ -82,7 +82,7 @@ chains_starting(trigger, S) when is_record(S, state) ->
     AllChains = lists:usort(brick_hash:all_chains(GH, current)
                             ++ brick_hash:all_chains(GH, new)),
     ?ELOG_INFO("AllChains = ~p", [AllChains]),
-    lists:map(
+    lists:foreach(
       fun({ChainName, _}) ->
               gmt_loop:do_while(
                 fun(X) ->
@@ -233,8 +233,7 @@ do_check_migration(S) ->
             %%       io:format("N = ~p, wanted = ~p, AllActiveChains = ~p\n",
             %%                 [N, length(AllActiveChains), AllActiveChains]),
             if N == length(AllActiveChains) ->
-                    brick_admin:table_finished_migration(TableName),
-                    ok;
+                    ok = brick_admin:table_finished_migration(TableName);
                true ->
                     NewT = T#table_r{ghash = GH},
                     S#state{tab = NewT}
