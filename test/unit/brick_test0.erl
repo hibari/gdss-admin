@@ -1275,7 +1275,7 @@ t91b(BrickName, Node, OptionList) ->
 cl_chain_t35() ->
     ok = reliable_gdss_stop(),
     os:cmd("rm -fr Schema.local hlog.*"),
-    application:start(gdss),
+    application:start(gdss_brick),
     brick_admin:bootstrap_local([], true, $/, 3, 1, 1, []),
 
     chain_t35([]),
@@ -1285,11 +1285,11 @@ cl_chain_t35() ->
 
 
 cl_single_brick_regression() ->
-    application:start(gdss),
+    application:start(gdss_brick),
     ok = single_brick_regression().
 
 cl_chain_all() ->
-    application:start(gdss),
+    application:start(gdss_brick),
     ok = brick_test0:chain_all().
 
 cl_simple_distrib_test(_X) ->
@@ -1369,7 +1369,7 @@ chain_all() ->
     chain_all(make_brick_option_lists()).
 
 chain_all(OptLists) ->
-    application:start(gdss),
+    application:start(gdss_brick),
     start_and_flush_common_log(),
     [ok = chain_all2(OptList) || OptList <- OptLists],
     ok = chain_t100(),
@@ -2814,7 +2814,7 @@ chain_t55(OptionList) ->
     os:cmd("rm -rf hlog.commonLogServer"),
     os:cmd("rm *" ++ MyBase ++ "*"),
     os:cmd("rm -rf hlog.*" ++ MyBase ++ "*"),
-    ok = application:start(gdss),
+    ok = application:start(gdss_brick),
     timer:sleep(1000),
     brick_admin:create_new_schema([{list_to_atom("bootstrap"++MyBase),node()}],
                                   SchemaFile),
@@ -2940,7 +2940,7 @@ chain_t55(OptionList) ->
 
     io:format("Test chain_t55: stopping brick application\n"),
     catch ok = reliable_gdss_stop(),
-    application:start(gdss),            % start again for following tests.
+    application:start(gdss_brick),            % start again for following tests.
     timer:sleep(100),                           % allow info reports to appear
     io:format("Test chain_t55: end\n"),
     ok.
@@ -2974,7 +2974,7 @@ chain_t56(OptionList) ->
                           os:cmd("rm -rf hlog.*" ++ MyBase ++ "*"),
                           os:cmd("rm -rf hlog.commonLogServer"),
                           ?ELOG_INFO("Test starting gdss app"),
-                          ok = application:start(gdss)
+                          ok = application:start(gdss_brick)
                   end,
     F_stopstart(),
     {ok, _} = brick_admin:create_new_schema(
@@ -3046,7 +3046,7 @@ chain_t100() ->
                           os:cmd("rm -rf hlog.*" ++ MyBase ++ "*"),
                           os:cmd("rm -rf hlog.commonLogServer"),
                           ?ELOG_INFO("Test starting gdss app\n"),
-                          ok = application:start(gdss)
+                          ok = application:start(gdss_brick)
                   end,
     F_stopstart(),
     {ok, _} = brick_admin:create_new_schema(
@@ -3131,7 +3131,7 @@ chain_t101() ->
                           os:cmd("rm -rf hlog.*" ++ MyBase ++ "*"),
                           os:cmd("rm -rf hlog.commonLogServer"),
                           ?ELOG_INFO("Test starting gdss app\n"),
-                          ok = application:start(gdss)
+                          ok = application:start(gdss_brick)
                   end,
     F_stopstart(),
     {ok, _} = brick_admin:create_new_schema(
@@ -3216,7 +3216,7 @@ chain_t102() ->
                           os:cmd("rm -rf hlog.*" ++ MyBase ++ "*"),
                           os:cmd("rm -rf hlog.commonLogServer"),
                           ?ELOG_INFO("Test starting gdss app\n"),
-                          ok = application:start(gdss)
+                          ok = application:start(gdss_brick)
                   end,
     F_stopstart(),
     {ok, _} = brick_admin:create_new_schema(
@@ -3273,7 +3273,7 @@ chain_t103() ->
                           os:cmd("rm -rf hlog.*" ++ MyBase ++ "*"),
                           os:cmd("rm -rf hlog.commonLogServer"),
                           ?ELOG_INFO("Test starting gdss app\n"),
-                          ok = application:start(gdss)
+                          ok = application:start(gdss_brick)
                   end,
     F_stopstart(),
     {ok, _} = brick_admin:create_new_schema(
@@ -4097,12 +4097,12 @@ slurp_all(Tab, Key, Prefix, SleepTime, {ok, {Ks, Bool}}, Num) ->
 
 reliable_gdss_stop() ->
     catch exit(whereis(brick_admin_sup), kill),
-    catch application:stop(gdss),
+    catch application:stop(gdss_brick),
     ok.
 
 reliable_gdss_stop_and_start() ->
     ok = reliable_gdss_stop(),
-    ok = application:start(gdss).
+    ok = application:start(gdss_brick).
 
 qc_check(NumTests, NumMore, Props) ->
     true = eqc:quickcheck(

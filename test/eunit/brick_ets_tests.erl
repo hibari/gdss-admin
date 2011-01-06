@@ -42,7 +42,7 @@ all_tests_test_() ->
       %%DISABLE ?_test(test_data_integrity())
      ]}.
 
--define(APPS, [gdss_admin, gdss_client, gdss, gmt, inets, crypto, sasl]).
+-define(APPS, [gdss_admin, gdss_client, gdss_brick, gmt_util, inets, crypto, sasl]).
 
 test_setup() ->
     %% @TODO - boilerplate start
@@ -54,7 +54,7 @@ test_setup() ->
     [ application:stop(A) || A <- ?APPS ],
     [ ok=application:start(A) || A <- lists:reverse(?APPS) ],
     random:seed(erlang:now()),
-    ok = application:set_env(gdss, brick_max_log_size_mb, 1),
+    ok = application:set_env(gdss_brick, brick_max_log_size_mb, 1),
     %% @TODO - boilerplate stop
     brick_admin:bootstrap_local([], true, $/, 3, 1, 1, []),
     Nodes = [node()],
@@ -186,7 +186,7 @@ wait_receive(N) ->
             wait_receive(N-1)
     after
         60000 ->
-            application:start(gdss)
+            application:start(gdss_brick)
     end.
 
 test_scavenger_get_keys() ->
@@ -195,7 +195,7 @@ test_scavenger_get_keys() ->
 
 restart_gdss(N) ->
     timer:sleep(N),
-    application:stop(gdss).
+    application:stop(gdss_brick).
 
 
 all_tables() ->

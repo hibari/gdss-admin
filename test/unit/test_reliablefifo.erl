@@ -36,7 +36,7 @@
 
 brick0() ->
     register(test0, self()),
-    application:start(gdss),
+    application:start(gdss_brick),
     start_brick0().
 
 start_brick0() ->
@@ -92,7 +92,7 @@ cl_chain_reliablefifo() ->
     dbg:p(all, call),
     %%    dbg:tpl(brick_server, handle_call_do, [{'_', [], [{return_trace}]}]),
     %%dbg:tpl(?MODULE, chain_reliablefifo, [{'_', [], [{return_trace}]}]),
-    application:start(gdss),
+    application:start(gdss_brick),
 
     %% wait for the tail starts
     timer:sleep(1000),

@@ -24,7 +24,7 @@
   {description, "Gemini Distributed Storage Service, Admin Server"},
   {vsn, "0.1.0"},
   {registered, []},
-  {applications, [kernel, stdlib, sasl, crypto, inets, gdss, gdss_client]},
+  {applications, [kernel, stdlib, sasl, crypto, inets, gdss_brick, gdss_client]},
   {mod, {brick_admin, []}},
   {modules, [brick_admin, brick_admin_sup, brick_admin_cinfo
              , brick_admin_event_h
