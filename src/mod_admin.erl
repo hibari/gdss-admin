@@ -44,13 +44,14 @@
 -export([dump_history/0, dump_history/1, dump_history_in_columns/0,
          admin_server_http_port/0]).
 
--ifdef(new_inets).
+-ifdef(old_inets).
+-include_lib("inets/src/httpd.hrl").
+-else.
 -include_lib("inets/src/http_server/httpd.hrl").
+
 -ifndef(NICE).
 -define(NICE(Reason),lists:flatten(atom_to_list(?MODULE)++": "++Reason)).
 -endif.
--else.
--include_lib("inets/src/httpd.hrl").
 -endif.
 
 -include("brick_hash.hrl").
