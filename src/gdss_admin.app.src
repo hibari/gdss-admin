@@ -45,4 +45,53 @@
          , {heartbeat_beacon_interval, 1000}
          , {heartbeat_failure_interval, 15}
         ]}
+  %%
+  %% admin_server_brick_pinger_sleep_random
+  %%   TODO
+  %%
+  %% admin_server_brick_poll
+  %%   TODO
+  %%
+  %% admin_server_chain_poll
+  %%   TODO
+  %%
+  %% admin_server_distributed_nodes
+  %%   Comma separated list of nodes eligible to run the Admin Server.
+  %%
+  %% application_data_dir
+  %%   Data directory for the database.
+  %%
+  %%   IMPORTANT: Do not change the location of the data directory
+  %%   after installation.
+  %%
+  %% brick_admin_conf_path
+  %%   If brick_admin_conf_path option is not present, admin HTTP
+  %%   listener will not run.
+  %%
+  %% brick_admin_http_tcp_port
+  %%   NOTE: The definitive value of brick_admin_http_tcp_port is
+  %%   really in the admin.conf file.
+  %%
+  %% brick_admin_mbox_high_water
+  %%   TODO
+  %%
+  %% heartbeat_beacon_interval
+  %%   Heartbeat beacon interval in milliseconds. At this interval,
+  %%   UDP heartbeart signals are transmitted from the local Hibari
+  %%   node to each other Hibari node in the cluster. The heartbeats
+  %%   are sent out both through network A and through network B.
+  %%   Recommended value is between 250 and 1000 (milliseconds).
+  %%
+  %% heartbeat_failure_interval
+  %%   Heartbeat failure interval in seconds. A serious error has
+  %%   occurred if during this interval a heartbeat from a peer Hibari
+  %%   node has been detected on network B but no heartbeat from that
+  %%   node has been detected on network A.  The network_a_tiebreaker
+  %%   address will be pinged to determine whether or not the local
+  %%   Hibari node should be shut down to avoid database damage.
+  %%
+  %%   NOTE: The value of heartbeat_failure_interval should be larger
+  %%   than the value of heartbeat_warning_interval by a factor of at
+  %%   least 1.5x but preferably 2x or more.
+  %%
  ]}.
