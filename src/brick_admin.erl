@@ -86,7 +86,7 @@
 %% API
 -export([start/1, stop/0, start_remote/1, % original API
          start/2, stop/1, % OTP application API
-         schema_filename/0,
+         schema_filename/0, bootstrap_nodes/0,
          create_new_schema/2, create_new_schema/3,
          copy_new_schema/2, copy_new_schema/3, do_copy_new_schema3/2,
          start_bootstrap_scan/0, get_schema_bricks/0, get_schema_bricks/1,
@@ -203,6 +203,7 @@
 -spec make_chain_description(atom(),non_neg_integer(),[atom()]) -> [{atom(),any()}].
 -spec make_common_table_opts(proplist(),boolean(),char(),non_neg_integer(),chainlist()) -> proplist().
 -spec schema_filename() -> nonempty_string().
+-spec bootstrap_nodes() -> [node()].
 -spec spam_gh_to_all_nodes() -> ok.
 -spec spam_gh_to_all_nodes(pid()) -> ok.
 -spec start([file:name()]|file:name()) -> ok | error().
@@ -324,6 +325,17 @@ stop(Args) ->
 
 schema_filename() ->
     "Schema.local".
+
+bootstrap_nodes() ->
+    {ok, Distrib} = application:get_env(kernel, distributed),
+    case lists:keyfind(gdss_admin, 1, Distrib) of
+        {gdss_admin, _, Nodes} ->
+            Nodes;
+        {gdss_admin, Nodes} ->
+            Nodes;
+        false ->
+            []
+    end.
 
 create_new_schema(InitialBrickList, File) ->
     create_new_schema(InitialBrickList, [], File).
@@ -1945,7 +1957,7 @@ check_for_other_admin_server_beacons(Intervals, MyStartTime, FailUSecs) ->
                   NewAcc = Acc + if not OthersP -> 0;
                                     true        -> 1
                                  end,
-                  io:format("OthersP ~p, cond ~p, NewAcc ~p\n", [OthersP, (Now < NowT + WaitT) andalso NewAcc == 0, NewAcc]),
+                  %% io:format("OthersP ~p, cond ~p, NewAcc ~p\n", [OthersP, (Now < NowT + WaitT) andalso NewAcc == 0, NewAcc]),
                   {(Now < NowT + WaitT) andalso NewAcc == 0, NewAcc}
           end, 0),
     N.
@@ -1954,15 +1966,15 @@ check_for_other_admin_server_beacons(Intervals, MyStartTime, FailUSecs) ->
 
 running_admin_beacons_p(USecs, MyStartTime) ->
     Bs0 = partition_detector_server:get_last_beacons(),
-    io:format("Bs0 ~p\n", [Bs0]),
+    %% io:format("Bs0 ~p\n", [Bs0]),
     Now = now(),
     Bs = lists:filter(fun(B) ->
                               io:format("Diff ~p ~p\n", [timer:now_diff(Now, B#beacon.time), B]),
                               timer:now_diff(Now, B#beacon.time) < USecs
                       end, Bs0),
-    io:format("Bs ~p\n", [Bs]),
+    %% io:format("Bs ~p\n", [Bs]),
     Es = lists:flatten([B#beacon.extra || B <- Bs]),
-    io:format("Es ~p\n", [Es]),
+    %% io:format("Es ~p\n", [Es]),
     lists:any(fun({brick_admin, {Phase, StartTime, Node, _Pid}}) ->
                       Diff = timer:now_diff(StartTime, MyStartTime),
                       Node /= node()

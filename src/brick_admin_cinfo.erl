@@ -56,7 +56,15 @@ admin_server_status(C) ->
     cluster_info:format(C, " My node: ~p\n", [node()]),
     cluster_info:format(C, " Admin Server node: ~p\n",
                         [catch node(global:whereis_name(brick_admin))]),
-    {ok, Nodes} = application:get_env(gdss_admin, admin_server_distributed_nodes),
+    {ok, Distrib} = application:get_env(kernel, distributed),
+    case lists:keyfind(gdss_admin, 1, Distrib) of
+        {gdss_admin, _, Nodes} ->
+            Nodes;
+        {gdss_admin, Nodes} ->
+            Nodes;
+        false ->
+            Nodes = []
+    end,
     cluster_info:format(C, " Admin Server eligible nodes: ~p\n", [Nodes]).
 
 admin_status_top(C) ->

@@ -37,7 +37,6 @@
   {env, [{admin_server_brick_pinger_sleep_random, 900}
          , {admin_server_brick_poll, 1400}
          , {admin_server_chain_poll, 4000}
-         , {admin_server_distributed_nodes, []}
          , {application_data_dir, "/dev/null"}
          , {brick_admin_conf_path, ""}
          , {brick_admin_http_tcp_port, 23080}

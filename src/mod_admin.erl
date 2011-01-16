@@ -645,11 +645,11 @@ make_reset(Name) ->
     ["<td><input type='reset' value='", Name, "'></input></td>"].
 
 make_bootstrap_tables() ->
-    {AdminStr, Boots} = read_bootstrap_nodes(),
+    Boots = brick_admin:bootstrap_nodes(),
+    AdminStr = io_lib:format("~p", [Boots]),
     M1 = if Boots == [] ->
-                 ["<h2>WARNING: Bad config value for 'admin_server_distributed_nodes'</h2>\n",
-                  "<p> The current value for the central.conf parameter "
-                  "'admin_server_distributed_nodes' is invalid: "
+                 ["<h2>WARNING: Bad config value for 'kernel/distrib/gdss_admin'</h2>\n",
+                  "<p> The current value is invalid: "
                   "<b>", AdminStr, "</b>.\n"
                   "<p> If this GDSS cluster will remain a single node "
                   "(i.e. for testing or development work), then you may "
@@ -663,10 +663,9 @@ make_bootstrap_tables() ->
                   "<hr><hr><hr>\n"
                  ];
             true ->
-                 AAL = [{Nd, catch rpc:call(Nd, application, get_env,
-                                            [gdss_admin, admin_server_distributed_nodes])}
+                 AAL = [{Nd, catch rpc:call(Nd, brick_admin, bootstrap_nodes, [])}
                         || Nd <- Boots],
-                 AllEqualP = case lists:usort([Bs || {_Nd, {ok,Bs}} <- AAL]) of
+                 AllEqualP = case lists:usort([Bs || {_Nd, Bs} <- AAL]) of
                                  Boots -> true;
                                  _     -> false
                              end,
@@ -675,27 +674,27 @@ make_bootstrap_tables() ->
                          [pong] -> true;
                          _      -> false
                      end,
-                 ["<h2>Checking config attribute 'admin_server_distributed_nodes'</h2>\n",
+                 ["<h2>Checking config attribute 'kernel/distrib/gdss_admin'</h2>\n",
                   "<p> <ul>\n",
-                  [ io_lib:format("<li> central.conf on node ~p: ~p\n",
+                  [ io_lib:format("<li> on node ~p: ~p\n",
                                   [Nd, Res])
                     || {Nd, Res} <- AAL],
                   "</ul>",
                   if AllEqualP and AllBootstrapRunningP ->
                           ["<p> Congratulations, the value of ",
-                           "'admin_server_distributed_nodes' is the same on "
+                           "'kernel/distrib/gdss_admin' is the same on "
                            "all ", integer_to_list(length(AAL)), " node(s).\n",
                            "<hr>\n"
                           ];
                      true ->
                           ["<p>\n",
-                           "<b>The value of 'admin_server_distributed_nodes' "
+                           "<b>The value of 'kernel/distrib/gdss_admin' "
                            "is not the same on all nodes.  This problem must "
                            "be fixed before continuing with the bootstrap "
                            "process.</b>\n"] ++
                               if not AllBootstrapRunningP ->
                                       ["<p> NOTICE: Not all nodes specified by ",
-                                       "the 'admin_server_distributed_nodes' "
+                                       "the 'kernel/distrib/gdss_admin' "
                                        "attribute are running.  All such nodes "
                                        "must be running before the bootstrap "
                                        "process can succeed.\n"];
@@ -703,8 +702,8 @@ make_bootstrap_tables() ->
                                       ""
                               end ++
                               ["<p> If it is your intent to have a single-node "
-                               "GDSS cluster, please edit central.conf to set "
-                               "the value of 'admin_server_distributed_nodes' to ",
+                               "GDSS cluster, please set "
+                               "the value of 'kernel/distrib/gdss_admin' to ",
                                "be the node name of the single node.\n",
                                lists:duplicate(64, "<hr>")]
                   end
@@ -970,7 +969,7 @@ get_bootstrap(Query, ModData) ->
     {KVList, _TabName, LocalP, VarPrefixP, PrefixSep, NumSep, DataProps, BPC,
      _NumNodesPerBlock, _BlockMultFactor} =
         parse_query_for_add_table(Query),
-    {_, Boots} = read_bootstrap_nodes(),
+    Boots = brick_admin:bootstrap_nodes(),
     LocalBtFile = brick_admin:schema_filename(),
 
     try if
@@ -1076,10 +1075,6 @@ integer_to_list_or_no_serial(no_serial) ->
     "no_serial";
 integer_to_list_or_no_serial(CUS) ->
     integer_to_list(CUS).
-
-read_bootstrap_nodes() ->
-    {ok, AdminNodes} = application:get_env(gdss_admin, admin_server_distributed_nodes),
-    {io_lib:format("~p", [AdminNodes]), AdminNodes}.
 
 add_table_html_form(TabName, SubmitURI) ->
     [
