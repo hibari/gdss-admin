@@ -1969,7 +1969,7 @@ running_admin_beacons_p(USecs, MyStartTime) ->
     %% io:format("Bs0 ~p\n", [Bs0]),
     Now = now(),
     Bs = lists:filter(fun(B) ->
-                              io:format("Diff ~p ~p\n", [timer:now_diff(Now, B#beacon.time), B]),
+                              %% io:format("Diff ~p ~p\n", [timer:now_diff(Now, B#beacon.time), B]),
                               timer:now_diff(Now, B#beacon.time) < USecs
                       end, Bs0),
     %% io:format("Bs ~p\n", [Bs]),
