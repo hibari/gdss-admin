@@ -666,11 +666,11 @@ make_bootstrap_tables() ->
                  AAL = [{Nd, catch rpc:call(Nd, brick_admin, bootstrap_nodes, [])}
                         || Nd <- Boots],
                  AllEqualP = case lists:usort([Bs || {_Nd, Bs} <- AAL]) of
-                                 Boots -> true;
-                                 _     -> false
+                                 [Boots] -> true;
+                                 _       -> false
                              end,
                  AllBootstrapRunningP =
-                     case lists:usort([catch net_adm:ping(Nd) || Nd<- Boots]) of
+                     case lists:usort([catch net_adm:ping(Nd) || Nd <- Boots]) of
                          [pong] -> true;
                          _      -> false
                      end,
