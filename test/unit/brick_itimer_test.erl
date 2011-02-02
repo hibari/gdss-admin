@@ -29,9 +29,9 @@
 -define(HOW_MANY_CONSUMER, 2000).
 -define(HOW_LONG, 60000).
 -define(INTERVAL, 2000).
+-define(STOP_AFTER_ITER, 30).
 %%-define(INTERVAL_TOLERANT, gmt_util:int_ify(?INTERVAL + (?INTERVAL / 10))). % 10%
 -define(INTERVAL_TOLERANT, gmt_util:int_ify(?INTERVAL + 20)).   % 1%
--define(STOP_AFTER_ITER, ?HOW_LONG / ?INTERVAL).
 %%-define(TIMER, timer).
 -define(TIMER, brick_itimer).
 

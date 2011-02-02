@@ -66,7 +66,7 @@
 -export([cl_qc_hlog_local_qc__t1/0, cl_qc_hlog_local_qc__t1/1,
          cl_qc_hlog_qc__t1/0, cl_qc_hlog_qc__t1/1,
          cl_qc_hlog_qc__t2/0, cl_qc_hlog_qc__t2/1,
-         cl_qc_hlog_qc_blackbox__t1/0, cl_qc_hlog_qc_blackbox__t1/1,
+         cl_qc_hlog_blackbox_eqc_tests__t1/0, cl_qc_hlog_blackbox_eqc_tests__t1/1,
          cl_qc_my_pread_qc__t1/0, cl_qc_my_pread_qc__t1/1,
          cl_qc_repair_qc__t1/0, cl_qc_repair_qc__t1/1,
          cl_qc_repair_qc__t2/0, cl_qc_repair_qc__t2/1,
@@ -174,7 +174,8 @@ single_brick_regression2(OptionList) ->
     ok.
 
 multiple_brick_regression(Nodes, BrickName) ->
-    ok = t60(Nodes, BrickName, 666).            % definitely broken
+    fail_t60_incomplete = t60(Nodes, BrickName, 666), % definitely broken
+    exit(fail_t60_incomplete).
 
 old_distrib_test(Nodes, BrickName, NumIters, RedundancyArg)
   when RedundancyArg == simple ->
@@ -882,7 +883,7 @@ t60(Nodes, BrickName, RS = _Summary) ->
 
     fail_t60_incomplete.
 
-t60_get(Nodes, BrickName, RS = Summary) ->
+t60_get(Nodes, BrickName, RS = _Summary) ->
     Key1 = "foo1",
     Val1 = "foo1-value",
     Key2 = "foo2",
@@ -990,22 +991,10 @@ t60_get(Nodes, BrickName, RS = Summary) ->
                 ok
         end,
 
-    %% TODO: get a better way of extracting info out of #summary record.
-    if element(2, Summary) /= simple ->
-            %% TODO: A future, stricter quorum enforcement mechanism might
-            %% want to refuse a get if only 1/3 of total nodes are available.
-            io:format("\n\n"
-                      "WARNING: Test does not support non-simple types!\n"
-                      "Fdown_combinations test will be skipped.\n"
-                      "\n\n"),
-            timer:sleep(4000);
-       true ->
-            _R2 = lists:map(Fdown_combinations, Damage_plus_Flags_Vars),
-            %% Start all bricks again, to put everyone into known state
-            [rpc:call(Node, brick_shepherd, start_brick,
-                      [BrickName, []]) || Node <- Nodes]
-    end,
-
+    _R2 = lists:map(Fdown_combinations, Damage_plus_Flags_Vars),
+    %% Start all bricks again, to put everyone into known state
+    [rpc:call(Node, brick_shepherd, start_brick,
+              [BrickName, []]) || Node <- Nodes],
     ok.
 
 t60_get_longer(Nodes, BrickName, RS = _Summary) ->
@@ -4117,7 +4106,7 @@ cl_qc_hlog_local_qc__t1([TestsA]) ->
     Tests = list_to_integer(atom_to_list(TestsA)),
     %% GDSS app must not be running for this test.
     ok = reliable_gdss_stop(),
-    true = qc_check(Tests, 10, hlog_local_qc:prop_local_log()),
+    true = qc_check(Tests, 10, hlog_local_eqc_tests:prop_local_log()),
     ok.
 
 cl_qc_hlog_qc__t1() ->
@@ -4126,7 +4115,7 @@ cl_qc_hlog_qc__t1() ->
 cl_qc_hlog_qc__t1([TestsA]) ->
     Tests = list_to_integer(atom_to_list(TestsA)),
     ok = reliable_gdss_stop_and_start(),
-    true = qc_check(Tests, 10, hlog_qc:prop_log(false)),
+    true = qc_check(Tests, 10, hlog_eqc_tests:prop_log(false)),
     ok.
 
 cl_qc_hlog_qc__t2() ->
@@ -4135,16 +4124,16 @@ cl_qc_hlog_qc__t2() ->
 cl_qc_hlog_qc__t2([TestsA]) ->
     Tests = list_to_integer(atom_to_list(TestsA)),
     ok = reliable_gdss_stop_and_start(),
-    true = qc_check(Tests, 10, hlog_qc:prop_log(true)),
+    true = qc_check(Tests, 10, hlog_eqc_tests:prop_log(true)),
     ok.
 
-cl_qc_hlog_qc_blackbox__t1() ->
-    cl_qc_hlog_qc_blackbox__t1([?NUM_QC_TESTS_DEFAULT_A]).
+cl_qc_hlog_blackbox_eqc_tests__t1() ->
+    cl_qc_hlog_blackbox_eqc_tests__t1([?NUM_QC_TESTS_DEFAULT_A]).
 
-cl_qc_hlog_qc_blackbox__t1([TestsA]) ->
+cl_qc_hlog_blackbox_eqc_tests__t1([TestsA]) ->
     Tests = list_to_integer(atom_to_list(TestsA)),
     ok = reliable_gdss_stop_and_start(),
-    true = qc_check(Tests, 10, hlog_qc_blackbox:prop_commands()),
+    true = qc_check(Tests, 10, hlog_blackbox_eqc_tests:prop_commands()),
     ok.
 
 cl_qc_my_pread_qc__t1() ->
@@ -4154,7 +4143,7 @@ cl_qc_my_pread_qc__t1([TestsA]) ->
     %% my_pread_qc tests are much shorter on average than most other QC tests.
     Tests = list_to_integer(atom_to_list(TestsA)) * 5,
     ok = reliable_gdss_stop_and_start(),
-    true = qc_check(Tests, 10, my_pread_qc:prop_pread()),
+    true = qc_check(Tests, 10, my_pread_eqc_tests:prop_pread()),
     ok.
 
 cl_qc_repair_qc__t1() ->
@@ -4177,7 +4166,7 @@ cl_qc_repair_qc__t1([TestsA]) ->
     ok = brick_admin:bootstrap_local([], true, $/, 3, 2, 2, [node()]),
     timer:sleep(5000),
 
-    Gen = repair_qc:prop_repair("./Unit-Quick-Files/repair.3k-keys",
+    Gen = repair_eqc_tests:prop_repair("./Unit-Quick-Files/repair.3k-keys",
                                 tab1_ch1, tab1_ch1_b1, [tab1_ch1_b2]),
     true = qc_check(Tests, 1, Gen),
     ok.
@@ -4202,7 +4191,7 @@ cl_qc_repair_qc__t2([TestsA]) ->
     ok = brick_admin:bootstrap_local([], true, $/, 3, 3, 3, [node()]),
     timer:sleep(25000),
 
-    Gen = repair_qc:prop_repair("./Unit-Quick-Files/repair.3k-keys",
+    Gen = repair_eqc_tests:prop_repair("./Unit-Quick-Files/repair.3k-keys",
                                 tab1_ch1, tab1_ch1_b1, [tab1_ch1_b2,tab1_ch1_b3]),
     true = qc_check(Tests, 1, Gen),
     ok.
@@ -4221,7 +4210,7 @@ cl_qc_simple_qc__t1([TestsA]) ->
     ok = brick_admin:bootstrap_local([], true, $/, 3, 1, 1, [node()]),
     timer:sleep(5000),
 
-    true = qc_check(Tests, 10, simple_qc:prop_simple1()),
+    true = qc_check(Tests, 10, simple_eqc_tests:prop_simple1()),
     ok.
 
 cl_qc_squorum_qc__t1() ->
@@ -4230,6 +4219,6 @@ cl_qc_squorum_qc__t1() ->
 cl_qc_squorum_qc__t1([TestsA]) ->
     Tests = list_to_integer(atom_to_list(TestsA)),
     ok = reliable_gdss_stop_and_start(),
-    [ok] = lists:usort(squorum_qc:start_bricks()),
-    true = qc_check(Tests, 10, squorum_qc:prop_squorum1()),
+    [ok] = lists:usort(squorum_eqc_tests:start_bricks()),
+    true = qc_check(Tests, 10, squorum_eqc_tests:prop_squorum1()),
     ok.

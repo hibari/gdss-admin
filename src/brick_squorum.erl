@@ -49,7 +49,7 @@
 -define(FOO_TIMEOUT, 15*1000).
 -define(SINGLE, brick_server).
 
--export([set/3, set/4, set/6, get/2, get/3, delete/2, delete/3,
+-export([set/3, set/4, set/6, get/2, get/3, get/4, delete/2, delete/3,
          get_keys/3, get_keys/4]).
 -export([multiset/2]).
 -export([t0/0]).                                % Unit tests
