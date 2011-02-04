@@ -262,7 +262,7 @@ make_brick_header(FullP) ->
 make_brick_header(Header, FullP) ->
     [<<"<table><tr class='head'><th>Name</th>">>, Header,
      if FullP ->
-             [<<"<th>Role</th><th>OT</th><th>CRS</th><th>CDRS</th><th>CUS</th><th>CDS</th><th>CRO</th><th>Size</th><th>Memory</th><th>Log</th><th>Sync</th><th>A</th><th>R</th><th>S</th><th>G</th><th>M</th><th>D</th><th>T</th><th>O</th><th>Old</th><th>Exp</th><th>Checkpoint</th>">>];
+             [<<"<th>Role</th><th>OT</th><th>CRS</th><th>CDRS</th><th>CUS</th><th>CDS</th><th>CRO</th><th>Size</th><th>Memory</th><th>Log</th><th>Sync</th><th>A</th><th>R</th><th>S</th><th>N</th><th>G</th><th>M</th><th>D</th><th>T</th><th>O</th><th>Old</th><th>Exp</th><th>Checkpoint</th>">>];
         true ->
              [<<"<th>Role</th><th>Status</th><th>ChkP</th><th>Keys</th><th>Mem</th>">>]
      end,
@@ -274,7 +274,7 @@ make_brick_footer() ->
 make_brick_footer(FullP) ->
     [<<"</table>\r\n">>,
      if FullP ->
-             [<<"<p>Role=chain role, OT=chain official tail, CRS=chain repair state, CDRS=chain downstream repair state, CUS=chain upstream serial, CDS=chain downstream serial, CRO=chain read only, Size=number of keys, Memory=memory used, Log=logging enabled Sync=synchronous writes enabled, A=number of add ops, R=number of replace ops, S=number of set ops, G=number of get ops, M=number of get_many ops, D=number of delete ops, T=number of transactions, O=number of do ops, Old=number of 'too old' ops, Exp=number of expired keys, Checkpoint=checkpoint status</p>\r\n">>];
+             [<<"<p>Role=chain role, OT=chain official tail, CRS=chain repair state, CDRS=chain downstream repair state, CUS=chain upstream serial, CDS=chain downstream serial, CRO=chain read only, Size=number of keys, Memory=memory used, Log=logging enabled Sync=synchronous writes enabled, A=number of add ops, R=number of replace ops, S=number of set ops, N=number of rename ops, G=number of get ops, M=number of get_many ops, D=number of delete ops, T=number of transactions, O=number of do ops, Old=number of 'too old' ops, Exp=number of expired keys, Checkpoint=checkpoint status</p>\r\n">>];
         true ->
              []
      end].
@@ -359,6 +359,7 @@ make_brick_row(Brick, Node, FullP, Data0) ->
         INA = proplists:get_value(n_add, Impl, 0),
         INR = proplists:get_value(n_replace, Impl, 0),
         INS = proplists:get_value(n_set, Impl, 0),
+        INN = proplists:get_value(n_rename, Impl, 0),
         ING = proplists:get_value(n_get, Impl, 0),
         INGM = proplists:get_value(n_get_many, Impl, 0),
         IND = proplists:get_value(n_delete, Impl, 0),
@@ -394,6 +395,7 @@ make_brick_row(Brick, Node, FullP, Data0) ->
                   <<"<td>">>, integer_to_list(INA), <<"</td>">>,
                   <<"<td>">>, integer_to_list(INR), <<"</td>">>,
                   <<"<td>">>, integer_to_list(INS), <<"</td>">>,
+                  <<"<td>">>, integer_to_list(INN), <<"</td>">>,
                   <<"<td>">>, integer_to_list(ING), <<"</td>">>,
                   <<"<td>">>, integer_to_list(INGM), <<"</td>">>,
                   <<"<td>">>, integer_to_list(IND), <<"</td>">>,
