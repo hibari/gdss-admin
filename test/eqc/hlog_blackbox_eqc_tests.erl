@@ -24,10 +24,10 @@
 -include_lib("eqc/include/eqc.hrl").
 -include_lib("eqc/include/eqc_statem.hrl").
 
--export([run_tests_/0, run_tests/0, run_tests/1]).
--export([start_noshrink_test/0, start_noshrink_test/1]).
--export([run_parallel_tests/0, run_parallel_tests/1]).
--export([run_parallel_noshrink_tests/0, run_parallel_noshrink_tests/1]).
+-export([run/0, run/1]).
+-export([start_noshrink/0, start_noshrink/1]).
+-export([run_parallel/0, run_parallel/1]).
+-export([run_parallel_noshrink/0, run_parallel_noshrink/1]).
 -export([sample_commands/0, sample_commands/1, prop_commands/0, prop_commands/1]).
 -export([counterexample_commands/0, counterexample_commands/1, counterexample_commands/2]).
 -export([counterexample_commands_read/1, counterexample_commands_write/1, counterexample_commands_write/2]).
@@ -104,32 +104,28 @@
 %%% API
 %%%----------------------------------------------------------------------
 
-%% external API
-run_tests_() ->
-    {timeout, 60, [fun() -> run_tests() end]}.
+run() ->
+    run(500).
 
-run_tests() ->
-    run_tests(500).
-
-run_tests(NumTests) ->
+run(NumTests) ->
     eqc:quickcheck(eqc:numtests(NumTests,prop_commands([{parallel,false}]))).
 
-start_noshrink_test() ->
-    start_noshrink_test(500).
+start_noshrink() ->
+    start_noshrink(500).
 
-start_noshrink_test(NumTests) ->
+start_noshrink(NumTests) ->
     eqc:quickcheck(eqc:numtests(NumTests,noshrink(prop_commands([{parallel,false}])))).
 
-run_parallel_tests() ->
-    run_parallel_tests(500).
+run_parallel() ->
+    run_parallel(500).
 
-run_parallel_tests(NumTests) ->
+run_parallel(NumTests) ->
     eqc:quickcheck(eqc:numtests(NumTests,prop_commands([{parallel,true}]))).
 
-run_parallel_noshrink_tests() ->
-    run_parallel_noshrink_tests(500).
+run_parallel_noshrink() ->
+    run_parallel_noshrink(500).
 
-run_parallel_noshrink_tests(NumTests) ->
+run_parallel_noshrink(NumTests) ->
     eqc:quickcheck(eqc:numtests(NumTests,noshrink(prop_commands([{parallel,true}])))).
 
 %% sample commands
@@ -655,7 +651,7 @@ commands_setup(_Hard) ->
     %% cleanup - rm -rf
     [ os:cmd("rm -rf " ++ X) || X <- ?DIRNAMES ],
     %% reset
-    ok = gmt_otp:reload_config(),
+    {ok,[]} = gmt_otp:reload_config(),
     {ok,noop}.
 
 %% @doc teardown helper

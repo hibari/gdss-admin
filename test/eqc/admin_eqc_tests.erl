@@ -29,7 +29,7 @@
 -define(TABLE, tab1).
 -define(INIT_IDLING, [newb0, newb1, newb2, newb3, newb4, newb5]).
 -define(RINTERVAL, 1000).
-%%-define(DEBUG_QC).
+%%-define(DEBUG_QC, true).
 
 -compile(export_all).
 
@@ -46,14 +46,12 @@
           idling_bricks % [Brick]
          }).
 
-run_tests_() ->
-    {timeout, 60, [fun() -> run_tests() end]}.
+run() ->
+    run(500).
 
-run_tests() ->
-    eqc:module({numtests, 500}, ?MODULE).
-
-run_tests(Tests) ->
-    eqc:module({numtests, Tests}, ?MODULE).
+run(NumTests) ->
+    brick_eunit_utils:setup_and_bootstrap(),
+    eqc:module({numtests,NumTests}, ?MODULE).
 
 %% props %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
 prop_0() ->

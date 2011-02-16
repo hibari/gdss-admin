@@ -25,14 +25,11 @@
 
 -compile(export_all).
 
-run_tests_() ->
-    {timeout, 60, [fun() -> run_tests() end]}.
+run() ->
+    run(30000).
 
-run_tests() ->
-    eqc:module({numtests, 500},?MODULE).
-
-run_tests(Tests) ->
-    eqc:module({numtests, Tests},?MODULE).
+run(NumTests) ->
+    eqc:module({numtests,NumTests}, ?MODULE).
 
 %%-define(MARGIN, 0.0000000000000001). % fails
 -define(MARGIN, 0.00000000000001).   % works

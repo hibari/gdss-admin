@@ -21,13 +21,6 @@
 
 -define(KILLTIME,30000).
 
-do_eunit() ->
-    S = "setup",
-    ?debugVal(S),
-    case eunit:test({timeout, 300, ?MODULE}) of
-        ok -> ok;
-        _ -> erlang:halt(1)
-    end.
 
 %%%----------------------------------------------------------------------
 %%% TESTS
@@ -42,21 +35,8 @@ all_tests_test_() ->
       %%DISABLE ?_test(test_data_integrity())
      ]}.
 
--define(APPS, [gdss_admin, gdss_client, gdss_brick, gmt_util, inets, crypto, sasl]).
-
 test_setup() ->
-    %% @TODO - boilerplate start
-    os:cmd("rm -rf Schema.local hlog.* root"),
-    os:cmd("ln -s ../../gdss_admin/priv/root ."),
-    os:cmd("epmd -kill; sleep 1"),
-    os:cmd("epmd -daemon; sleep 1"),
-    {ok, _} = net_kernel:start(['eunit@localhost', shortnames]),
-    [ application:stop(A) || A <- ?APPS ],
-    [ ok=application:start(A) || A <- lists:reverse(?APPS) ],
-    random:seed(erlang:now()),
-    ok = application:set_env(gdss_brick, brick_max_log_size_mb, 1),
-    %% @TODO - boilerplate stop
-    brick_admin:bootstrap_local([], true, $/, 3, 1, 1, []),
+    X = brick_eunit_utils:setup_and_bootstrap(),
     Nodes = [node()],
     GDSSAdmin = node(),
     ChainLen = 1,
@@ -66,13 +46,10 @@ test_setup() ->
     offset_table = ets:new(offset_table,[ordered_set,named_table,public]),
     load_tables(?KILLTIME),
 
-    ok.
+    X.
 
-test_teardown(_) ->
-    %% @TODO - boilerplate start
-    [ application:stop(A) || A <- ?APPS ],
-    ok = net_kernel:stop(),
-    %% @TODO - boilerplate stop
+test_teardown(X) ->
+    brick_eunit_utils:teardown(X),
     [ ets:delete(T) || {T,[],true} <- all_tables() ],
     ets:delete(offset_table),
     ok.

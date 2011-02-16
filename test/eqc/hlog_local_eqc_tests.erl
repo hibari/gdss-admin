@@ -49,21 +49,18 @@
           hunks_bigblob = []
          }).
 
-run_tests_() ->
-    {timeout, 60, [fun() -> run_tests() end]}.
+run() ->
+    run(500).
 
-run_tests() ->
-    eqc:module({numtests, 500}, ?MODULE).
-
-run_tests(Tests) ->
-    eqc:module({numtests, Tests}, ?MODULE).
+run(NumTests) ->
+    eqc:module({numtests,NumTests}, ?MODULE).
 
 prop_local_log() ->
     io:format("\n\nNOTE: GDSS app can't be running while this test runs.\n"),
     io:format("      Run: application:stop(gdss).\n\n"),
     %%timer:sleep(2000),
     ?FORALL(Cmds,
-            eqc_statem:more_commands(5,?MODULE),
+            eqc_statem:more_commands(5,eqc_statem:commands(?MODULE)),
             collect({length(Cmds) div 10, div10},
                     begin
                         stop_all(),

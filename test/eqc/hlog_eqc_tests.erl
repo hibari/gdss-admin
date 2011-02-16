@@ -45,14 +45,11 @@
           hunks_long = []                       % list()
          }).
 
-run_tests_() ->
-    {timeout, 60, [fun() -> run_tests() end]}.
+run() ->
+    run(500).
 
-run_tests() ->
-    eqc:module({numtests, 500},?MODULE).
-
-run_tests(Tests) ->
-    eqc:module({numtests, Tests},?MODULE).
+run(NumTests) ->
+    eqc:module({numtests,NumTests}, ?MODULE).
 
 prop_log() ->
     prop_log(false).

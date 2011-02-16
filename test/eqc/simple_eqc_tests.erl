@@ -39,20 +39,17 @@
 
 -record(state, {
           step = 1,
-          dict,                         % key = term(),
-                                                % val = [term()] of possible vals
-          bricks,                       % list(brick_names())
-          quotas_are_set = false        % boolean()
+          dict,                         %% key = term(),
+                                        %% val = [term()] of possible vals
+          bricks,                       %% list(brick_names())
+          quotas_are_set = false        %% boolean()
          }).
 
-run_tests_() ->
-    {timeout, 60, [fun() -> run_tests() end]}.
+run() ->
+    run(500).
 
-run_tests() ->
-   eqc:module({numtests, 500}, ?MODULE).
-
-run_tests(Tests) ->
-    eqc:module({numtests, Tests}, ?MODULE).
+run(NumTests) ->
+    eqc:module({numtests,NumTests}, ?MODULE).
 
 prop_simple1() ->
     common1_prop(fun(X, S) -> X == ok andalso ets_table_sizes_match_p(S) end,

@@ -32,7 +32,7 @@
 -define(TEST_NAME_STR, "regression_test0").
 -define(BIGDATA_DIR,   "./regression-bigdata-dir").
 
--define(NUM_QC_TESTS_DEFAULT_A, '500').
+-define(NUM_EQC_TESTS_DEFAULT, 500).
 
 -compile(export_all).
 
@@ -63,15 +63,15 @@
 -export([cl_simple_distrib_test/1, cl_old_distrib_test/1]).
 
 %% Command line ("erl -s") testing of QuickCheck-based tests.
--export([cl_qc_hlog_local_qc__t1/0, cl_qc_hlog_local_qc__t1/1,
-         cl_qc_hlog_qc__t1/0, cl_qc_hlog_qc__t1/1,
-         cl_qc_hlog_qc__t2/0, cl_qc_hlog_qc__t2/1,
-         cl_qc_hlog_blackbox_eqc_tests__t1/0, cl_qc_hlog_blackbox_eqc_tests__t1/1,
-         cl_qc_my_pread_qc__t1/0, cl_qc_my_pread_qc__t1/1,
-         cl_qc_repair_qc__t1/0, cl_qc_repair_qc__t1/1,
-         cl_qc_repair_qc__t2/0, cl_qc_repair_qc__t2/1,
-         cl_qc_simple_qc__t1/0, cl_qc_simple_qc__t1/1,
-         cl_qc_squorum_qc__t1/0, cl_qc_squorum_qc__t1/1]).
+-export([cl_eqc_hlog_local_eqc__t1/0, cl_eqc_hlog_local_eqc__t1/1,
+         cl_eqc_hlog_eqc__t1/0, cl_eqc_hlog_eqc__t1/1,
+         cl_eqc_hlog_eqc__t2/0, cl_eqc_hlog_eqc__t2/1,
+         cl_eqc_hlog_blackbox_eqc__t1/0, cl_eqc_hlog_blackbox_eqc__t1/1,
+         cl_eqc_my_pread_eqc__t1/0, cl_eqc_my_pread_eqc__t1/1,
+         cl_eqc_repair_eqc__t1/0, cl_eqc_repair_eqc__t1/1,
+         cl_eqc_repair_eqc__t2/0, cl_eqc_repair_eqc__t2/1,
+         cl_eqc_simple_eqc__t1/0, cl_eqc_simple_eqc__t1/1,
+         cl_eqc_squorum_eqc__t1/0, cl_eqc_squorum_eqc__t1/1]).
 
 -export([t1/2, t2/2, t3/2, t4/2, t5/2, t7/2, t8/2, t9/2, t10/2,
          t50/4, t51/5, t60/3, t90/2, t91/2, t91/3]).
@@ -1262,10 +1262,7 @@ t91b(BrickName, Node, OptionList) ->
 
 
 cl_chain_t35() ->
-    ok = reliable_gdss_stop(),
-    os:cmd("rm -fr Schema.local hlog.*"),
-    application:start(gdss_brick),
-    brick_admin:bootstrap_local([], true, $/, 3, 1, 1, []),
+    ok = brick_eunit_utils:setup_and_bootstrap(),
 
     chain_t35([]),
 
@@ -4085,13 +4082,10 @@ slurp_all(Tab, Key, Prefix, SleepTime, {ok, {Ks, Bool}}, Num) ->
     end.
 
 reliable_gdss_stop() ->
-    catch exit(whereis(brick_admin_sup), kill),
-    catch application:stop(gdss_brick),
-    ok.
+    brick_eunit_utils:teardown().
 
 reliable_gdss_stop_and_start() ->
-    ok = reliable_gdss_stop(),
-    ok = application:start(gdss_brick).
+    brick_eunit_utils:setup().
 
 qc_check(NumTests, NumMore, Props) ->
     true = eqc:quickcheck(
@@ -4099,64 +4093,58 @@ qc_check(NumTests, NumMore, Props) ->
                eqc:numtests(
                  NumTests, eqc_statem:more_commands(NumMore, Props)))).
 
-cl_qc_hlog_local_qc__t1() ->
-    cl_qc_hlog_local_qc__t1([?NUM_QC_TESTS_DEFAULT_A]).
+cl_eqc_hlog_local_eqc__t1() ->
+    cl_eqc_hlog_local_eqc__t1(?NUM_EQC_TESTS_DEFAULT).
 
-cl_qc_hlog_local_qc__t1([TestsA]) ->
-    Tests = list_to_integer(atom_to_list(TestsA)),
+cl_eqc_hlog_local_eqc__t1(Tests) ->
     %% GDSS app must not be running for this test.
     ok = reliable_gdss_stop(),
     true = qc_check(Tests, 10, hlog_local_eqc_tests:prop_local_log()),
     ok.
 
-cl_qc_hlog_qc__t1() ->
-    cl_qc_hlog_qc__t1([?NUM_QC_TESTS_DEFAULT_A]).
+cl_eqc_hlog_eqc__t1() ->
+    cl_eqc_hlog_eqc__t1(?NUM_EQC_TESTS_DEFAULT).
 
-cl_qc_hlog_qc__t1([TestsA]) ->
-    Tests = list_to_integer(atom_to_list(TestsA)),
+cl_eqc_hlog_eqc__t1(Tests) ->
     ok = reliable_gdss_stop_and_start(),
     true = qc_check(Tests, 10, hlog_eqc_tests:prop_log(false)),
     ok.
 
-cl_qc_hlog_qc__t2() ->
-    cl_qc_hlog_qc__t1([?NUM_QC_TESTS_DEFAULT_A]).
+cl_eqc_hlog_eqc__t2() ->
+    cl_eqc_hlog_eqc__t1(?NUM_EQC_TESTS_DEFAULT).
 
-cl_qc_hlog_qc__t2([TestsA]) ->
-    Tests = list_to_integer(atom_to_list(TestsA)),
+cl_eqc_hlog_eqc__t2(Tests) ->
     ok = reliable_gdss_stop_and_start(),
     true = qc_check(Tests, 10, hlog_eqc_tests:prop_log(true)),
     ok.
 
-cl_qc_hlog_blackbox_eqc_tests__t1() ->
-    cl_qc_hlog_blackbox_eqc_tests__t1([?NUM_QC_TESTS_DEFAULT_A]).
+cl_eqc_hlog_blackbox_eqc__t1() ->
+    cl_eqc_hlog_blackbox_eqc__t1(?NUM_EQC_TESTS_DEFAULT).
 
-cl_qc_hlog_blackbox_eqc_tests__t1([TestsA]) ->
-    Tests = list_to_integer(atom_to_list(TestsA)),
+cl_eqc_hlog_blackbox_eqc__t1(Tests) ->
     ok = reliable_gdss_stop_and_start(),
     true = qc_check(Tests, 10, hlog_blackbox_eqc_tests:prop_commands()),
     ok.
 
-cl_qc_my_pread_qc__t1() ->
-    cl_qc_my_pread_qc__t1([?NUM_QC_TESTS_DEFAULT_A]).
+cl_eqc_my_pread_eqc__t1() ->
+    cl_eqc_my_pread_eqc__t1(?NUM_EQC_TESTS_DEFAULT).
 
-cl_qc_my_pread_qc__t1([TestsA]) ->
+cl_eqc_my_pread_eqc__t1(Tests) ->
     %% my_pread_qc tests are much shorter on average than most other QC tests.
-    Tests = list_to_integer(atom_to_list(TestsA)) * 5,
     ok = reliable_gdss_stop_and_start(),
     true = qc_check(Tests, 10, my_pread_eqc_tests:prop_pread()),
     ok.
 
-cl_qc_repair_qc__t1() ->
-    cl_qc_repair_qc__t1([?NUM_QC_TESTS_DEFAULT_A]).
+cl_eqc_repair_eqc__t1() ->
+    cl_eqc_repair_eqc__t1(?NUM_EQC_TESTS_DEFAULT).
 
-cl_qc_repair_qc__t1([TestsA]) ->
+cl_eqc_repair_eqc__t1(Tests0) ->
     %% Tests for qc_repair.erl are typically much slower than other QC tests.
-    Tests = case list_to_integer(atom_to_list(TestsA)) div 5 of
+    Tests = case Tests0 div 5 of
                 0 -> 1;
                 N -> N
             end,
     io:format("\n\n\nNOTE: Adjusted repair tests = ~p\n\n\n\n", [Tests]),
-    timer:sleep(3000),
 
     ok = reliable_gdss_stop(),
     os:cmd("rm -r Schema.local"),
@@ -4166,22 +4154,21 @@ cl_qc_repair_qc__t1([TestsA]) ->
     ok = brick_admin:bootstrap_local([], true, $/, 3, 2, 2, [node()]),
     timer:sleep(5000),
 
-    Gen = repair_eqc_tests:prop_repair("./Unit-Quick-Files/repair.3k-keys",
+    Gen = repair_eqc_tests:prop_repair("../test/eqc/repair.3k-keys",
                                 tab1_ch1, tab1_ch1_b1, [tab1_ch1_b2]),
     true = qc_check(Tests, 1, Gen),
     ok.
 
-cl_qc_repair_qc__t2() ->
-    cl_qc_repair_qc__t2([?NUM_QC_TESTS_DEFAULT_A]).
+cl_eqc_repair_eqc__t2() ->
+    cl_eqc_repair_eqc__t2(?NUM_EQC_TESTS_DEFAULT).
 
-cl_qc_repair_qc__t2([TestsA]) ->
+cl_eqc_repair_eqc__t2(Tests0) ->
     %% Tests for qc_repair.erl are typically much slower than other QC tests.
-    Tests = case list_to_integer(atom_to_list(TestsA)) div 5 of
+    Tests = case Tests0 div 5 of
                 0 -> 1;
                 N -> N
             end,
     io:format("\n\n\nNOTE: Adjusted repair tests = ~p\n\n\n\n", [Tests]),
-    timer:sleep(3000),
 
     ok = reliable_gdss_stop(),
     os:cmd("rm -r Schema.local"),
@@ -4191,17 +4178,15 @@ cl_qc_repair_qc__t2([TestsA]) ->
     ok = brick_admin:bootstrap_local([], true, $/, 3, 3, 3, [node()]),
     timer:sleep(25000),
 
-    Gen = repair_eqc_tests:prop_repair("./Unit-Quick-Files/repair.3k-keys",
+    Gen = repair_eqc_tests:prop_repair("../test/eqc/repair.3k-keys",
                                 tab1_ch1, tab1_ch1_b1, [tab1_ch1_b2,tab1_ch1_b3]),
     true = qc_check(Tests, 1, Gen),
     ok.
 
-cl_qc_simple_qc__t1() ->
-    cl_qc_simple_qc__t1([?NUM_QC_TESTS_DEFAULT_A]).
+cl_eqc_simple_eqc__t1() ->
+    cl_eqc_simple_eqc__t1(?NUM_EQC_TESTS_DEFAULT).
 
-cl_qc_simple_qc__t1([TestsA]) ->
-    Tests = list_to_integer(atom_to_list(TestsA)),
-
+cl_eqc_simple_eqc__t1(Tests) ->
     ok = reliable_gdss_stop(),
     os:cmd("rm -r Schema.local"),
     os:cmd("rm -rf hlog.*"),
@@ -4213,11 +4198,10 @@ cl_qc_simple_qc__t1([TestsA]) ->
     true = qc_check(Tests, 10, simple_eqc_tests:prop_simple1()),
     ok.
 
-cl_qc_squorum_qc__t1() ->
-    cl_qc_squorum_qc__t1([?NUM_QC_TESTS_DEFAULT_A]).
+cl_eqc_squorum_eqc__t1() ->
+    cl_eqc_squorum_eqc__t1(?NUM_EQC_TESTS_DEFAULT).
 
-cl_qc_squorum_qc__t1([TestsA]) ->
-    Tests = list_to_integer(atom_to_list(TestsA)),
+cl_eqc_squorum_eqc__t1(Tests) ->
     ok = reliable_gdss_stop_and_start(),
     [ok] = lists:usort(squorum_eqc_tests:start_bricks()),
     true = qc_check(Tests, 10, squorum_eqc_tests:prop_squorum1()),
