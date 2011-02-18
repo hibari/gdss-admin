@@ -19,6 +19,9 @@
 
 -define(APPS, [gdss_admin, gdss_client, gdss_brick, gmt_util, inets, crypto, sasl]).
 
+-define(MYNODE, 'gdss_eunit@localhost').
+
+
 %%%----------------------------------------------------------------------
 %%% TEST UTILS
 %%%----------------------------------------------------------------------
@@ -32,7 +35,12 @@ setup(Verbose) ->
     os:cmd("ln -s ../../gdss_admin/priv/root ."),
     os:cmd("epmd -kill; sleep 1"),
     os:cmd("epmd -daemon; sleep 1"),
-    {ok, _} = net_kernel:start(['gdss_eunit@localhost', shortnames]),
+    case net_kernel:start([?MYNODE, shortnames]) of
+        {ok, _} ->
+            ok;
+        {error, {{already_started, _}, _}} ->
+            ok
+    end,
     [ application:load(A) || A <- ?APPS ],
     ok = application:set_env(sasl, errlog_type, error),
     ok = application:set_env(gdss_brick, brick_max_log_size_mb, 1),
@@ -60,7 +68,12 @@ teardown() ->
 teardown(_) ->
     catch exit(whereis(brick_admin_sup), kill),
     [ application:stop(A) || A <- ?APPS ],
-    net_kernel:stop(),
+    case node() of
+        ?MYNODE ->
+            net_kernel:stop();
+        _ ->
+            ok
+    end,
     ok.
 
 wait_for_tables() ->
