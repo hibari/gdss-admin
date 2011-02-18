@@ -357,26 +357,6 @@ t2(BrickName, Node) ->
     {ok, {ManyRes6, false}} = ?M:get_many(BrickName, Node, ?BRICK__GET_MANY_FIRST, 1111, [witness, get_all_attribs]),
     [{<<"zzz1">>, _, [{val_len, 10}]}] = lists:nthtail(ManyRes3Len, ManyRes6),
 
-    %% Test the next_op_is_silent do op.
-    OpsNoSilent = [?M:make_get("bar"), ?M:make_get("baz")],
-    [{ok, _, <<"bar22">>}, {ok, _, <<"baz3">>}] = ?M:do(BrickName, Node, OpsNoSilent),
-
-    OpsSilent1 = [?M:make_get("bar"),
-                  ?M:make_next_op_is_silent(),
-                  ?M:make_get("baz")],
-    [{ok, _, <<"bar22">>}] = ?M:do(BrickName, Node, OpsSilent1),
-
-    OpsSilent2 = [?M:make_txn()|OpsSilent1],
-    [{ok, _, <<"bar22">>}] = ?M:do(BrickName, Node, OpsSilent2),
-
-    OpsSilent3 = [?M:make_txn(), ?M:make_next_op_is_silent(),
-                  ?M:make_get("baz")],
-    [] = ?M:do(BrickName, Node, OpsSilent3),
-
-    OpsSilent4 = [?M:make_txn(), ?M:make_next_op_is_silent(),
-                  ?M:make_get("baz", [{testset, -44}])],
-    {txn_fail, _} = ?M:do(BrickName, Node, OpsSilent4),
-
     io:format("Test t2: end (will have nested t1() output!)\n"),
     ok.
 

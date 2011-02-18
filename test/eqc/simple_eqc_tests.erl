@@ -41,8 +41,7 @@
           step = 1,
           dict,                         %% key = term(),
                                         %% val = [term()] of possible vals
-          bricks,                       %% list(brick_names())
-          quotas_are_set = false        %% boolean()
+          bricks                        %% list(brick_names())
          }).
 
 run() ->
@@ -53,7 +52,7 @@ run(NumTests) ->
 
 prop_simple1() ->
     common1_prop(fun(X, S) -> X == ok andalso ets_table_sizes_match_p(S) end,
-                 [{set_initial_quota, false}]).
+                 []).
 
 %% Use the *_noproc_ok() versions when chain lengths are changing or
 %% when data migrations are happening.
@@ -74,20 +73,10 @@ prop_simple1_noproc_ok() ->
                              _ ->
                                  false
                          end
-                 end, [{set_initial_quota, false}]).
-
-prop_quota1() ->
-    common1_prop(fun(X, S) -> X == ok
-                                  andalso
-                                  ok == check_all_quotas(S)
-                                  andalso
-                                  ets_table_sizes_match_p(S)
-                 end, [{set_initial_quota, true}]).
+                 end, []).
 
 common1_prop(F_check, Env) ->
     io:format("\n\nHibari: get_many() has been commented out from command()\n\n"),
-    timer:sleep(2000),
-    io:format("\n\nHibari: timeout for quota ops is not an error, temp only!\n\n"),
     timer:sleep(2000),
     ?FORALL(Cmds, eqc_statem:commands(?MODULE),
             collect({length(Cmds) div 10, div10},
@@ -141,17 +130,6 @@ delete_all_max_keys() ->
 %% command :: (S::symbolic_state()) :: gen(call() | stop)
 %% Called in symbolic context.
 
-command(#state{step = 1}) ->
-    %% Mangle the quotas to be something that gets a mix of item failures
-    %% and byte failures.  Uncommenting some io:format() statements can
-    %% help decide which quota values are too small, too big, just right.
-    {call, ?MODULE, set_quota_settings, [{var, set_initial_quota},
-                                         list_to_binary(key_prefix()),
-                                         frequency([{1, 0},
-                                                    {4, choose(1, 15)}]),
-                                         frequency([{1, 0},
-                                                    {4, choose(1, 90)}]),
-                                         0, 0]};
 command(S) ->
     ?LET(Exp, make_exp(S),
          frequency(
@@ -171,18 +149,12 @@ command(S) ->
             {2,   {call, ?MODULE, trigger_checkpoint, [oneof(S#state.bricks)]}},
 
             %% 2-tier storage and sync changing isn't good, yet.
-                                                %        {1,   {call, ?MODULE, set_do_sync, [oneof(S#state.bricks),
-                                                %                                          oneof([true, false])]}},
+            %%        {1,   {call, ?MODULE, set_do_sync, [oneof(S#state.bricks),
+            %%                                          oneof([true, false])]}},
             {3,   {call, ?MODULE, scavenge, [oneof(S#state.bricks)]}},
-            {3,   {call, ?MODULE, sync_down_the_chain, [oneof(S#state.bricks)]}},
+            {3,   {call, ?MODULE, sync_down_the_chain, [oneof(S#state.bricks)]}}
 
             %% {1,   {call, ?MODULE, crash_brick, [oneof(S#state.bricks)]}},
-            {10,  {call, ?MODULE, resum_quota,
-                   [{var, set_initial_quota}, oneof(S#state.bricks),
-                    list_to_binary(key_prefix())]}},
-            {10,   {call, ?MODULE, check_quota,
-                    [{var, set_initial_quota}, oneof(S#state.bricks),
-                     list_to_binary(key_prefix())]}}
            ])).
 
 random_do(S) ->
@@ -201,9 +173,9 @@ random_do(S) ->
 random_do_flags() ->
     %% I think that sync_override is broken.
     [].
-                                                %     ?LET({F1, F2}, {frequency([{10, []}, {5, [{sync_override, bool()}]}]),
-                                                %                   frequency([{10, []}, {5, [ignore_role_bad_idea_delme]}])},
-                                                %        F1 ++ F2).
+%%     ?LET({F1, F2}, {frequency([{10, []}, {5, [{sync_override, bool()}]}]),
+%%                   frequency([{10, []}, {5, [ignore_role_bad_idea_delme]}])},
+%%        F1 ++ F2).
 
 random_get_flags() ->
     oneof([[], [get_all_attribs]]).
@@ -218,8 +190,6 @@ random_many_key() ->
 %% precondition(S::symbolic_state(), C::call()) :: bool()
 %% Called in symbolic (??) & runtime context.
 
-precondition(_S, {call, _, set_quota_settings, _}) ->
-    true;
 precondition(_S, {call, _, simple_set, [_Key, _Val, _Exp, _Flags]}) ->
     true;
 precondition(_S, {call, _, simple_add, [_Key, _Val, _Exp, _Flags]}) ->
@@ -250,10 +220,6 @@ precondition(_S, {call, _, sync_down_the_chain, _}) ->
     true;
 precondition(_S, {call, _, crash_brick, _}) ->
     true;
-precondition(_S, {call, _, resum_quota, _}) ->
-    true;
-precondition(_S, {call, _, check_quota, _}) ->
-    true;
 precondition(_S, Call) ->
     io:format("\nprecondition: what the heck is this?  ~p\n", [Call]),
     timer:sleep(1000),
@@ -280,36 +246,28 @@ postcondition(S, C, R) ->
             false
     end.
 
-postcondition2(_S, {call, _, set_quota_settings, _}, _R) ->
-    true;
-postcondition2(_S, {call, _, simple_set, [_Key, Val, _Exp, _Flags]} = _C, R) ->
+postcondition2(_S, {call, _, simple_set, [_Key, _Val, _Exp, _Flags]} = _C, R) ->
     case R of
-        {quota_error, QRoot} ->
-            quota_error_is_ok(QRoot, Val);
         _ ->
             is_ok(R)
     end;
-postcondition2(S, {call, _, simple_add, [Key, Val, _Exp, _Flags]} = _C, R) ->
+postcondition2(S, {call, _, simple_add, [Key, _Val, _Exp, _Flags]} = _C, R) ->
     Vs = orddict:fetch(Key, S#state.dict),
     case R of
         %%      %% For brick txn semantics
         %%      {txn_fail, [{_, {key_exists, _TS}}]} ->
         %%          Vs /= [];
-        {quota_error, QRoot} ->
-            quota_error_is_ok(QRoot, Val);
         {key_exists, _TS} ->
             has_one_definite_or_maybe_val(Vs);
         ok ->
             has_zero_definite_vals(Vs)
     end;
-postcondition2(S, {call, _, simple_replace, [Key, Val, _Exp, _Flags]} = _C, R) ->
+postcondition2(S, {call, _, simple_replace, [Key, _Val, _Exp, _Flags]} = _C, R) ->
     Vs = orddict:fetch(Key, S#state.dict),
     case R of
         %%      %% For brick txn semantics
         %%      {txn_fail, [{_, key_not_exist}]} ->
         %%          Vs == [];
-        {quota_error, QRoot} ->
-            quota_error_is_ok(QRoot, Val);
         key_not_exist ->
             has_zero_definite_vals(Vs);
         ok ->
@@ -366,10 +324,6 @@ postcondition2(S, {call, _, simple_do, [CrudeOps, _]} = _C, R) ->
     case R of
         %%      {txn_fail, _} ->
         %%          true;
-        {quota_error, _QRoot} ->
-            %% TODO: Really, we should check the entire sequence of
-            %% crude ops to verify that they pushed us over the edge.
-            true;
         L when is_list(L) ->
             CrudeRes = lists:zip(CrudeOps, R),
             Bools = lists:map(
@@ -389,39 +343,6 @@ postcondition2(_S, {call, _, sync_down_the_chain, _}, _R) ->
     true;
 postcondition2(_S, {call, _, crash_brick, _}, _R) ->
     true;
-postcondition2(_S, {call, _, resum_quota, [Bool, {BrickName, BrickNode} = _C, _]}, R) ->
-    case R of
-        ok ->
-            Bool == true;
-        key_not_exist ->
-            Bool == false;
-        {error, current_repair_state, _} ->
-            true;                               % Not fully repaired yet.
-        {error, current_role, {_, undefined, undefined}} = _Ex1 ->
-            true;                               % Not fully running yet.
-        {'EXIT', {timeout, _}} ->
-            true;                               % Hibari temp hack?
-        Err ->
-            io:format("ERR: resum_quota Err = ~p\n", [Err]),
-            chain_get_role(BrickName, BrickNode) == undefined
-    end;
-postcondition2(S, {call, _, check_quota, [Bool, {BrickName, BrickNode}, QRoot]} = _C, R) ->
-    case R of
-        {quota_root, QRoot, _TS, _Val, _ExpTime, _Flags} ->
-            ok = check_all_quotas(S),
-            true;
-        key_not_exist ->
-            Bool == false;
-        {error, current_repair_state, _} ->
-            true;                               % Not fully repaired yet.
-        {error, current_role, {_, undefined, undefined}} = _Ex1 ->
-            true;                               % Not fully running yet.
-        {'EXIT', {timeout, _}} ->
-            true;                               % Hibari temp hack?
-        Err ->
-            io:format("ERR: check_quota Err = ~p\n", [Err]),
-            chain_get_role(BrickName, BrickNode) == undefined
-    end;
 postcondition2(_S, _Call, _R) ->
     false.
 
@@ -438,11 +359,6 @@ next_state(S, R, C) ->
     NewS = next_state2(S, R, C),
     NewS#state{step = S#state.step + 1}.
 
-next_state2(S, _, {call, _, set_quota_settings, [Bool|_]}) ->
-    S#state{step = S#state.step + 1, quotas_are_set = Bool};
-
-next_state2(S, {quota_error, _}, {call, _, simple_set, [_Key, _Val, _Exp, _Flags]}) ->
-    S;
 next_state2(S, Result, {call, _, simple_set, [Key, Val, _Exp, _Flags]}) ->
     Old = orddict:fetch(Key, S#state.dict),
     New = case Result of ok          -> [Val];
@@ -483,8 +399,6 @@ next_state2(S, Result, {call, _, simple_delete, [Key]}) ->
           end,
     S#state{dict = orddict:store(Key, New, S#state.dict)};
 
-next_state2(S, {quota_error, _}, {call, _, simple_do, [_CrudeOps, _]}) ->
-    S;
 next_state2(S, FailedResult, {call, _, simple_do, [CrudeOps, _]} = C)
   when is_tuple(FailedResult) ->
     %% Make N copies of FailedResult and try again.
@@ -516,10 +430,6 @@ next_state2(S, _Result, {call, _, scavenge, _}) ->
 next_state2(S, _Result, {call, _, sync_down_the_chain, _}) ->
     S;
 next_state2(S, _Result, {call, _, crash_brick, _}) ->
-    S;
-next_state2(S, _Result, {call, _, resum_quota, _}) ->
-    S;
-next_state2(S, _Result, {call, _, check_quota, _}) ->
     S;
 next_state2(S, _Result, _Call) ->
     S.
@@ -592,22 +502,6 @@ is_ok_notex(ok) ->            true;
 is_ok_notex(key_not_exist) -> true;
 is_ok_notex(X) ->             X.
 
-check_all_quotas(S) ->
-    Prefix = list_to_binary(key_prefix()),
-    {Q_i, Q_b, Q_iu, Q_bu} = fetch_quota_settings(Prefix),
-    {Items, Bytes} = calc_actual_usage(Prefix),
-    expect_equal(brick_items_u, Q_iu, Items),
-    expect_equal(brick_bytes_u, Q_bu, Bytes),
-
-    {S_items, S_bytes} = calc_state_usage(S),
-    expect_equal(state_items_u, Q_iu, S_items),
-    expect_equal(state_bytes_u, Q_bu, S_bytes),
-
-    %% Finally, verify that the actual usage doesn't exceed any limit.
-    true = (Q_i >= Items),
-    true = (Q_b >= Bytes),
-    ok.
-
 expect_equal(_Tag, X, X) ->
     ok;
 expect_equal(Tag, Got, Expected) ->
@@ -623,33 +517,6 @@ calc_state_usage(S) ->
               {Items + 1, Bytes + gmt_util:io_list_len(H)}
       end, {0, 0}, Hs).
 
-
-fetch_quota_settings(QRoot) ->
-    Q_names = [quota_items, quota_bytes, quota_items_used, quota_bytes_used],
-    case brick_simple:get(?TABLE, QRoot, [get_all_attribs]) of
-        {ok, _, _, _, Flags}  ->
-            {[[{quota_items, Q_i}], [{quota_bytes, Q_b}],
-              [{quota_items_used, Q_iu}], [{quota_bytes_used, Q_bu}]],
-             _OtherQFlags} = proplists:split(Flags, Q_names),
-            {Q_i, Q_b, Q_iu, Q_bu};
-        key_not_exist ->
-            io:format("fetch_quota_settings: key_not_exist\n"),
-            {0, 0, 0, 0}
-    end.
-
-set_quota_settings(Bool, QRoot, Items, Bytes) ->
-    set_quota_settings(Bool, QRoot, Items, Bytes, 0, 0).
-
-set_quota_settings(false, _QRoot, _Items, _Bytes, _ItemsUsed, _BytesUsed) ->
-    no_quotas;
-set_quota_settings(true, QRoot, Items, Bytes, ItemsUsed, BytesUsed) ->
-    ok = brick_simple:set(?TABLE, QRoot, <<>>,
-                          [{quota_items, Items}, {quota_bytes, Bytes},
-                           {quota_items_used, ItemsUsed},
-                           {quota_bytes_used, BytesUsed}]),
-    %% io:format("~w ~w,", [Items, Bytes]),
-    {Items, Bytes, ItemsUsed, BytesUsed}.
-
 calc_actual_usage(QRoot) ->
     {ok, {All, false}} = brick_simple:get_many(?TABLE, QRoot, ?MAX_KEYS+70,
                                                [{binary_prefix, QRoot}]),
@@ -657,20 +524,6 @@ calc_actual_usage(QRoot) ->
     Items = length(Vals),
     Bytes = lists:foldl(fun(X, Sum) -> size(X) + Sum end, 0, Vals),
     {Items, Bytes}.
-
-quota_error_is_ok(QRoot, Val) ->
-    {Q_i, Q_b, Q_iu, Q_bu} = fetch_quota_settings(QRoot),
-    Bytes = gmt_util:io_list_len(Val),
-    if Q_iu + 1 > Q_i, Q_i > 0 ->               % 0 = no quota limit
-            io:format("i"),
-            true;
-       Q_bu + Bytes > Q_b, Q_b > 0 ->           % 0 = no quota limit
-            io:format("b"),
-            true;
-       true ->
-            io:format("quota_error not ok: ~p\n", [{Q_i, Q_b, Q_iu, Q_bu}]),
-            false
-    end.
 
 trigger_checkpoint({BrickName, Node}) ->
     io:format("c"),
@@ -691,15 +544,6 @@ sync_down_the_chain({BrickName, Node}) ->
 
 crash_brick({BrickName, Node}) ->
     catch brick_server:stop({BrickName, Node}).
-
-resum_quota(_Bool, {BrickName, Node}, QRoot) ->
-    catch brick_server:resum_quota(BrickName, Node, QRoot).
-
-check_quota(_Bool, {BrickName, Node}, QRoot) ->
-    catch brick_server:get_quota(BrickName, Node, QRoot).
-
-set_quota(_Bool, {BrickName, Node}, QRoot) ->
-    catch brick_server:get_quota(BrickName, Node, QRoot).
 
 all_do_list_are(DoList, Type) ->
     lists:all(fun(Do) -> classify_do(Do) == Type end, DoList).
@@ -755,19 +599,15 @@ ets_table_sizes_match_p(S) ->
                      end
              end, 0).
 
-ets_table_sizes_match_p2(_AorB, S) ->
+ets_table_sizes_match_p2(_AorB, _S) ->
     L11s = (catch [Exp || {_, _, _, _, Exp} <- ets:tab2list(tab1_ch1_b1_store)]),
     L11e = (catch ets:tab2list(tab1_ch1_b1_exp)),
     L12s = (catch [Exp || {_, _, _, _, Exp} <- ets:tab2list(tab1_ch1_b2_store)]),
     L12e = (catch ets:tab2list(tab1_ch1_b2_exp)),
     Len11s = (catch length(L11s)),
-    Len11e = (catch length(L11e) + if not S#state.quotas_are_set -> 0;
-                                      true                       -> 1
-                                   end),
+    Len11e = (catch length(L11e)),
     Len12s = (catch length(L12s)),
-    Len12e = (catch length(L12e) + if not S#state.quotas_are_set -> 0;
-                                      true                       -> 1
-                                   end),
+    Len12e = (catch length(L12e)),
     Res = if not is_integer(Len11s) ->
                   if not is_integer(Len12s) ->
                           %% Neither table exists, so avoid stopping
