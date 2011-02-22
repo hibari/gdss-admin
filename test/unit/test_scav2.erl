@@ -266,12 +266,11 @@ get_keys00(Tab,StartCheckpoint) ->
 
 init0() ->
     MyBase = "testtable",
-    SchemaFile = MyBase ++ "schema.txt",
+    %% SchemaFile = MyBase ++ "schema.txt",
     Tab = list_to_atom(MyBase),
 
-    start_admin(list_to_atom(MyBase++"_"++"bootstrap"),SchemaFile),
     create_table(Tab),
-    timer:sleep(5000),
+    timer:sleep(10000),
 
     EtsName = ctab(Tab),
     io:format(":::ctab: ~p~n",[EtsName]),
@@ -484,13 +483,6 @@ check_log(Dir) ->
 
 
 
-start_admin(Bootstrap,SchemaFile) ->
-    {ok, _} = brick_admin:create_new_schema(
-                [{Bootstrap,node()}],
-                SchemaFile),
-    ok = brick_admin:start(SchemaFile),
-    poll_admin_server_registered().
-
 create_table(Tab) ->
     ChDescr = brick_admin:make_chain_description(
                 Tab, 1, [node()]),
@@ -499,20 +491,6 @@ create_table(Tab) ->
                            {do_logging,true},
                            {do_sync,true}
                           ]).
-
-
-poll_admin_server_registered() ->
-    Max = 80,
-    Fpoll = fun(N) ->
-                    case whereis(brick_admin) of
-                        undefined when N < Max ->
-                            timer:sleep(100),
-                            {true, N+1};
-                        _ ->
-                            {false, N}
-                    end
-            end,
-    gmt_loop:do_while(Fpoll, 0) < Max.
 
 scav_wait() ->
     F_excl_wait =
