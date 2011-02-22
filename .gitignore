@@ -4,5 +4,6 @@
 *.huc
 *.log
 *.script
+*.HLOG
 .eunit/
 erl_crash.dump
