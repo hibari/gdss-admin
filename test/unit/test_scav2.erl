@@ -403,7 +403,7 @@ do(_Tab,KeysSplit,PParent,Fun0,Name) ->
                           fun(N) ->
                                   receive
                                       stop_client ->
-                                          io:format(":::stop_client:::~n"),
+                                          %% io:format(":::stop_client:::~n"),
                                           PParent ! client_done,
                                           exit(normal)
                                   after 0 ->
