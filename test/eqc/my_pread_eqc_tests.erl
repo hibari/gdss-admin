@@ -19,10 +19,20 @@
 
 -module(my_pread_eqc_tests).
 
--ifdef(EQC).
+-ifdef(PROPER).
+-include_lib("proper/include/proper.hrl").
+-define(GMTQC, proper).
+-undef(EQC).
+-endif. %% -ifdef(PROPER).
 
+-ifdef(EQC).
 -include_lib("eqc/include/eqc.hrl").
 -include_lib("eqc/include/eqc_statem.hrl").
+-define(GMTQC, eqc).
+-undef(PROPER).
+-endif. %% -ifdef(EQC).
+
+-ifdef(GMTQC).
 
 -include_lib("kernel/include/file.hrl").
 
@@ -32,7 +42,7 @@ run() ->
     run(500).
 
 run(NumTests) ->
-    eqc:module({numtests,NumTests}, ?MODULE).
+    ?GMTQC:module({numtests,NumTests}, ?MODULE).
 
 -record(state, {
           size_f1,
@@ -46,9 +56,9 @@ run(NumTests) ->
          }).
 
 prop_pread() ->
-    ?FORALL(Cmds, eqc_statem:commands(?MODULE),
+    ?FORALL(Cmds, commands(?MODULE),
             begin
-                {_Hist, S, Res} = eqc_statem:run_commands(?MODULE, Cmds),
+                {_Hist, S, Res} = run_commands(?MODULE, Cmds),
                 ?WHENFAIL(begin
                               io:format("S = ~p\nR = ~p, Hist = ~p\n",
                                         [S, Res, _Hist]),
@@ -140,7 +150,7 @@ change_fd(_Sym) ->
     ok.
 
 read_fd(S, Offset, Len) ->
-    %io:format("r<~p,~p,~p", [S#state.cur_sym_fh, Offset, Len]),
+    %%io:format("r<~p,~p,~p", [S#state.cur_sym_fh, Offset, Len]),
     FH = get_test_fh(S),
     gmt_hlog:my_pread_start(),
     Res = gmt_hlog:my_pread(FH, Offset, Len, 0),
@@ -157,4 +167,4 @@ get_standard_fh(#state{cur_sym_fh = b} = S) -> S#state.standard_fh2.
 get_size(#state{cur_sym_fh = a} = S) -> S#state.size_f1;
 get_size(#state{cur_sym_fh = b} = S) -> S#state.size_f2.
 
--endif. %% -ifdef(EQC).
+-endif. %% -ifdef(GMTQC).

@@ -19,12 +19,22 @@
 
 -module(squorum_eqc_tests).
 
+-ifdef(PROPER).
+-include_lib("proper/include/proper.hrl").
+-define(GMTQC, proper).
+-undef(EQC).
+-endif. %% -ifdef(PROPER).
+
 -ifdef(EQC).
-
--define(NOTEST, true). %% TEST FAILS
-
 -include_lib("eqc/include/eqc.hrl").
 -include_lib("eqc/include/eqc_statem.hrl").
+-define(GMTQC, eqc).
+-undef(PROPER).
+-endif. %% -ifdef(EQC).
+
+-ifdef(GMTQC).
+
+-define(NOTEST, true). %% TEST FAILS
 
 -include("brick_hash.hrl").
 -include("brick_public.hrl").
@@ -62,7 +72,7 @@ run() ->
     run(500).
 
 run(NumTests) ->
-    eqc:module({numtests,NumTests}, ?MODULE).
+    ?GMTQC:module({numtests,NumTests}, ?MODULE).
 
 start_bricks() ->
     [catch start_brick(B) || B <- ?BRICKS].
@@ -97,10 +107,10 @@ prop_squorum1() ->
               end)).
 
 common1_prop(F_check, Env) ->
-    ?FORALL(Cmds,eqc_statem:commands(?MODULE),
+    ?FORALL(Cmds,commands(?MODULE),
             collect({length(Cmds) div 10, div10},
                     begin
-                        {_Hist, S, Res} = eqc_statem:run_commands(?MODULE, Cmds, Env),
+                        {_Hist, S, Res} = run_commands(?MODULE, Cmds, Env),
                         ?WHENFAIL(begin
                                       io:format("Env = ~p\nS = ~p\nR = ~p\nHist = ~p\n", [Env, S, Res, _Hist]),
                                       ok
@@ -473,4 +483,4 @@ poll_repair_state({Brick, Node}, Wanted, SleepMs, MaxIters) ->
         end,
     gmt_loop:do_while(RepairPoll, MaxIters).
 
--endif. %% -ifdef(EQC).
+-endif. %% -ifdef(GMTQC).

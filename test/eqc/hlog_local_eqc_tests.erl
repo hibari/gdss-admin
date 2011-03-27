@@ -19,10 +19,20 @@
 
 -module(hlog_local_eqc_tests).
 
--ifdef(EQC).
+-ifdef(PROPER).
+-include_lib("proper/include/proper.hrl").
+-define(GMTQC, proper).
+-undef(EQC).
+-endif. %% -ifdef(PROPER).
 
+-ifdef(EQC).
 -include_lib("eqc/include/eqc.hrl").
 -include_lib("eqc/include/eqc_statem.hrl").
+-define(GMTQC, eqc).
+-undef(PROPER).
+-endif. %% -ifdef(EQC).
+
+-ifdef(GMTQC).
 
 -include("gmt_hlog.hrl").
 -include_lib("kernel/include/file.hrl").
@@ -53,19 +63,19 @@ run() ->
     run(500).
 
 run(NumTests) ->
-    eqc:module({numtests,NumTests}, ?MODULE).
+    ?GMTQC:module({numtests,NumTests}, ?MODULE).
 
 prop_local_log() ->
     io:format("\n\nNOTE: GDSS app can't be running while this test runs.\n"),
     io:format("      Run: application:stop(gdss).\n\n"),
     %%timer:sleep(2000),
     ?FORALL(Cmds,
-            eqc_statem:more_commands(5,eqc_statem:commands(?MODULE)),
+            more_commands(5,commands(?MODULE)),
             collect({length(Cmds) div 10, div10},
                     begin
                         stop_all(),
                         delete_all(),
-                        {_Hist, S, Res} = eqc_statem:run_commands(?MODULE, Cmds),
+                        {_Hist, S, Res} = run_commands(?MODULE, Cmds),
                         if S#state.num_logs > 0 -> sync_full_writeback();
                            true                 -> ok
                         end,
@@ -416,4 +426,4 @@ find_first_nonnul(B, Offset) when Offset < size(B) ->
 find_first_nonnul(_, _) ->
     ok.
 
--endif. %% -ifdef(EQC).
+-endif. %% -ifdef(GMTQC).

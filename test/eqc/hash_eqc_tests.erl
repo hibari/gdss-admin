@@ -19,9 +19,19 @@
 
 -module(hash_eqc_tests).
 
--ifdef(EQC).
+-ifdef(PROPER).
+-include_lib("proper/include/proper.hrl").
+-define(GMTQC, proper).
+-undef(EQC).
+-endif. %% -ifdef(PROPER).
 
+-ifdef(EQC).
 -include_lib("eqc/include/eqc.hrl").
+-define(GMTQC, eqc).
+-undef(PROPER).
+-endif. %% -ifdef(EQC).
+
+-ifdef(GMTQC).
 
 -compile(export_all).
 
@@ -29,7 +39,7 @@ run() ->
     run(30000).
 
 run(NumTests) ->
-    eqc:module({numtests,NumTests}, ?MODULE).
+    ?GMTQC:module({numtests,NumTests}, ?MODULE).
 
 %%-define(MARGIN, 0.0000000000000001). % fails
 -define(MARGIN, 0.00000000000001).   % works
@@ -48,7 +58,7 @@ prop_1() ->
             end).
 
 prop_1(N_Times) ->
-    eqc:numtests(N_Times, prop_1()).
+    numtests(N_Times, prop_1()).
 
 prop_2() ->
     ?FORALL({FloatMap, Weights},
@@ -61,15 +71,14 @@ prop_2() ->
             end).
 
 prop_2(N_Times) ->
-    eqc:numtests(N_Times, prop_2()).
+    numtests(N_Times, prop_2()).
 
 gen_weight_list(AllowDuplicatesP) ->
     ?LET({Len, V_MEMBERS},
          {choose(1, 10), if AllowDuplicatesP -> atoms();
                             true             -> [true, false]
                          end},
-         ?LET(V, lists:zip(lists:duplicate(Len, oneof(V_MEMBERS)),
-                           lists:duplicate(Len, choose(1, 20))),
+         ?LET(V, vector(Len, {oneof(V_MEMBERS),choose(1,20)}),
               begin
                   V2 = convert_weight_list(V, 1, []),
                   if AllowDuplicatesP -> % Overload meaning: normalize!
@@ -113,8 +122,7 @@ within_margin(Sum, Margin, Target) ->
 gen_float_list_alt() ->
     ?LET(Len,
          choose(1, 10),
-         ?LET(V, lists:zip(lists:duplicate(Len, oneof(atoms())),
-                           lists:duplicate(Len, choose(1, 20))),
+         ?LET(V, vector(Len, {oneof(atoms()),choose(1,20)}),
               begin
                   V2 = convert_weight_list(V, 1, []),
                   Sum = sum_all_weights(V2),
@@ -125,8 +133,7 @@ gen_float_list_alt() ->
 gen_weight_list_alt() ->
     ?LET(Len,
          choose(1, 10),
-         ?LET(V, lists:zip(lists:duplicate(Len, oneof([true, false])),
-                           lists:duplicate(Len, choose(1, 20))),
+         ?LET(V, vector(Len, {oneof([true, false]),choose(1,20)}),
               begin
                   V2 = convert_weight_list(V, 1, []),
                   if V2 /= [] ->
@@ -174,4 +181,4 @@ gb_next_always_works(NextFloatList, GbTree) ->
         end,
     lists:all(F, lists:zip(NextFloatList, SecondForPair)).
 
--endif. %% -ifdef(EQC).
+-endif. %% -ifdef(GMTQC).

@@ -93,7 +93,7 @@ eunit_brick_itimer_test_() ->
 %%      {timeout, 600, [?_test(fun() -> ?assertEqual(ok, test_scav2:test_all()) end)]}
 %%     }.
 
--ifdef(EQC).
+-ifdef(GMTQC).
 
 eunit_eqc_hlog_local_eqc__t1_test_() ->
     {setup, fun setup_noop/0, fun teardown_noop/1,
@@ -140,5 +140,5 @@ eunit_eqc_simple_eqc__t1_test_() ->
 %% cause a failure).  Do not use until fixed.
 %% ?_test(fun() -> ?assertEqual(ok, cl_eqc_hlog_eqc__t2([100])) end),
 
--endif. %% EQC
+-endif. %% GMTQC
 

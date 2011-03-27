@@ -19,10 +19,20 @@
 
 -module(hlog_eqc_tests).
 
--ifdef(EQC).
+-ifdef(PROPER).
+-include_lib("proper/include/proper.hrl").
+-define(GMTQC, proper).
+-undef(EQC).
+-endif. %% -ifdef(PROPER).
 
+-ifdef(EQC).
 -include_lib("eqc/include/eqc.hrl").
 -include_lib("eqc/include/eqc_statem.hrl").
+-define(GMTQC, eqc).
+-undef(PROPER).
+-endif. %% -ifdef(EQC).
+
+-ifdef(GMTQC).
 
 -include("gmt_hlog.hrl").
 -include_lib("kernel/include/file.hrl").
@@ -49,7 +59,7 @@ run() ->
     run(500).
 
 run(NumTests) ->
-    eqc:module({numtests,NumTests}, ?MODULE).
+    ?GMTQC:module({numtests,NumTests}, ?MODULE).
 
 prop_log() ->
     prop_log(false).
@@ -59,11 +69,11 @@ prop_log(EnableScribbleTestP) ->
               "is not a real failure and can be ignored safely.\n\n"),
     %%timer:sleep(1000),
     ?FORALL(Cmds,
-            eqc_gen:with_parameters([{scribble, EnableScribbleTestP}],
-                            eqc_statem:commands(?MODULE)),
+            with_parameters([{scribble, EnableScribbleTestP}],
+                            commands(?MODULE)),
             collect({length(Cmds) div 10, div10},
                     begin
-                        {_Hist, S, Res} = eqc_statem:run_commands(?MODULE, Cmds),
+                        {_Hist, S, Res} = run_commands(?MODULE, Cmds),
                         catch ?MUT:stop(S#state.server),
                         ?WHENFAIL(begin
                                       io:format("S = ~p\nR = ~p\n", [S, Res]),
@@ -484,4 +494,4 @@ do_scribbles(ArgsList, PathT) ->
 %% Pread "./zzz-hlog-qc/000000000005.HLOG" at Pos 32 for 23 bytes
 %% Use Scribble <<"©©©©©©©©©©©©©©©©©©©©©©©">> at "./zzz-hlog-qc/000000000005.HLOG" Pos 32
 
--endif. %% -ifdef(EQC).
+-endif. %% -ifdef(GMTQC).

@@ -19,6 +19,19 @@
 
 -module(brick_test0).
 
+-ifdef(PROPER).
+-include_lib("proper/include/proper.hrl").
+-define(GMTQC, proper).
+-undef(EQC).
+-endif. %% -ifdef(PROPER).
+
+-ifdef(EQC).
+-include_lib("eqc/include/eqc.hrl").
+-include_lib("eqc/include/eqc_statem.hrl").
+-define(GMTQC, eqc).
+-undef(PROPER).
+-endif. %% -ifdef(EQC).
+
 -include("brick.hrl").
 -include("brick_admin.hrl").
 -include("brick_hash.hrl").
@@ -2064,7 +2077,7 @@ chain_t35(OptionList) ->
                                       true ->
                                            MinQuorum - 1
                                    end,
-                        FailBricks = lists:sublist(shuffle(Bricks0), NumFails),
+                        FailBricks = lists:sublist(my_shuffle(Bricks0), NumFails),
                         ok = ?SQ:set(Bricks0, K, V),
                         {ok, _, V} = ?SQ:get(Bricks0, K),
                         [ok = ?M:delete(Br, Nd, K) || {Br, Nd} <- FailBricks],
@@ -2091,7 +2104,7 @@ chain_t35(OptionList) ->
                                       true ->
                                            MinQuorum
                                    end,
-                        FailBricks = lists:sublist(shuffle(Bricks0), NumFails),
+                        FailBricks = lists:sublist(my_shuffle(Bricks0), NumFails),
                         ok = ?SQ:set(Bricks0, K, V),
                         [ok = ?M:delete(Br, Nd, K) || {Br, Nd} <- FailBricks],
                         {key_not_exist, QSize, MinQuorum, NumFails} =
@@ -2742,8 +2755,8 @@ chain_t54(_OptionList) ->
     %% Randomness adds non-determinism to test, but that
     %% only makes it tougher to figure out who failed.
     %% It doesn't affect pass/fail result.
-    [error = Ftest(shuffle(T)) || T <- Bad,  _ <- lists:seq(1,100)],
-    [ok    = Ftest(shuffle(T)) || T <- Good, _ <- lists:seq(1,100)],
+    [error = Ftest(my_shuffle(T)) || T <- Bad,  _ <- lists:seq(1,100)],
+    [ok    = Ftest(my_shuffle(T)) || T <- Good, _ <- lists:seq(1,100)],
 
     io:format("Test chain_t54: end\n"),
     ok.
@@ -3848,7 +3861,7 @@ chain_stop_entire_chain(BrickList) ->
               rpc:call(Node, brick_shepherd, stop_brick, [Name])
       end, BrickList).
 
-shuffle(L) ->
+my_shuffle(L) ->
     lists:sort(fun(_, _) -> random:uniform(100) =< 50 end, L).
 
 perms([]) ->
@@ -4067,11 +4080,16 @@ reliable_gdss_stop() ->
 reliable_gdss_stop_and_start() ->
     brick_eunit_utils:setup().
 
+-ifdef(GMTQC).
 qc_check(NumTests, NumMore, Props) ->
-    true = eqc:quickcheck(
-             eqc_gen:noshrink(
-               eqc:numtests(
-                 NumTests, eqc_statem:more_commands(NumMore, Props)))).
+    true = ?GMTQC:quickcheck(
+              noshrink(
+                numtests(
+                  NumTests, more_commands(NumMore, Props)))).
+-else.
+qc_check(_NumTests, _NumMore, _Props) ->
+    true.
+-endif. %% -ifdef(GMTQC).
 
 cl_eqc_hlog_local_eqc__t1() ->
     cl_eqc_hlog_local_eqc__t1(?NUM_EQC_TESTS_DEFAULT).
@@ -4135,7 +4153,7 @@ cl_eqc_repair_eqc__t1(Tests0) ->
     timer:sleep(5000),
 
     Gen = repair_eqc_tests:prop_repair("../test/eqc/repair.3k-keys",
-                                tab1_ch1, tab1_ch1_b1, [tab1_ch1_b2]),
+                                       tab1_ch1, tab1_ch1_b1, [tab1_ch1_b2]),
     true = qc_check(Tests, 1, Gen),
     ok.
 
@@ -4159,7 +4177,7 @@ cl_eqc_repair_eqc__t2(Tests0) ->
     timer:sleep(25000),
 
     Gen = repair_eqc_tests:prop_repair("../test/eqc/repair.3k-keys",
-                                tab1_ch1, tab1_ch1_b1, [tab1_ch1_b2,tab1_ch1_b3]),
+                                       tab1_ch1, tab1_ch1_b1, [tab1_ch1_b2,tab1_ch1_b3]),
     true = qc_check(Tests, 1, Gen),
     ok.
 

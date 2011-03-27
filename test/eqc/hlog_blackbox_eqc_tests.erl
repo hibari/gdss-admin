@@ -19,10 +19,20 @@
 
 -module(hlog_blackbox_eqc_tests).
 
--ifdef(EQC).
+-ifdef(PROPER).
+-include_lib("proper/include/proper.hrl").
+-define(GMTQC, proper).
+-undef(EQC).
+-endif. %% -ifdef(PROPER).
 
+-ifdef(EQC).
 -include_lib("eqc/include/eqc.hrl").
 -include_lib("eqc/include/eqc_statem.hrl").
+-define(GMTQC, eqc).
+-undef(PROPER).
+-endif. %% -ifdef(EQC).
+
+-ifdef(GMTQC).
 
 -export([run/0, run/1]).
 -export([start_noshrink/0, start_noshrink/1]).
@@ -108,25 +118,25 @@ run() ->
     run(500).
 
 run(NumTests) ->
-    eqc:quickcheck(eqc:numtests(NumTests,prop_commands([{parallel,false}]))).
+    ?GMTQC:quickcheck(numtests(NumTests,prop_commands([{parallel,false}]))).
 
 start_noshrink() ->
     start_noshrink(500).
 
 start_noshrink(NumTests) ->
-    eqc:quickcheck(eqc:numtests(NumTests,noshrink(prop_commands([{parallel,false}])))).
+    ?GMTQC:quickcheck(numtests(NumTests,noshrink(prop_commands([{parallel,false}])))).
 
 run_parallel() ->
     run_parallel(500).
 
 run_parallel(NumTests) ->
-    eqc:quickcheck(eqc:numtests(NumTests,prop_commands([{parallel,true}]))).
+    ?GMTQC:quickcheck(numtests(NumTests,prop_commands([{parallel,true}]))).
 
 run_parallel_noshrink() ->
     run_parallel_noshrink(500).
 
 run_parallel_noshrink(NumTests) ->
-    eqc:quickcheck(eqc:numtests(NumTests,noshrink(prop_commands([{parallel,true}])))).
+    ?GMTQC:quickcheck(numtests(NumTests,noshrink(prop_commands([{parallel,true}])))).
 
 %% sample commands
 sample_commands() ->
@@ -147,10 +157,10 @@ counterexample_commands() ->
     counterexample_commands([]).
 
 counterexample_commands(Options) ->
-    counterexample_commands(Options, eqc:counterexample()).
+    counterexample_commands(Options, ?GMTQC:counterexample()).
 
 counterexample_commands(Options, CounterExample) ->
-    eqc:check(prop_commands(Options), CounterExample).
+    ?GMTQC:check(prop_commands(Options), CounterExample).
 
 %% counterexample commands read
 counterexample_commands_read(FileName) ->
@@ -159,7 +169,7 @@ counterexample_commands_read(FileName) ->
 
 %% counterexample commands write
 counterexample_commands_write(FileName) ->
-    counterexample_commands_write(FileName, eqc:counterexample()).
+    counterexample_commands_write(FileName, ?GMTQC:counterexample()).
 
 counterexample_commands_write(FileName, CounterExample) ->
     file:write_file(FileName, io_lib:format("~p.", [CounterExample])).
@@ -371,7 +381,7 @@ binary(I,J) ->
 
 %% initial_state -> symbolic_state()
 initial_state() ->
-%    ?LET(Parallel,parameter(parallel),
+    %%    ?LET(Parallel,parameter(parallel),
     ?LET(Parallel,false,
          #state{parallel=Parallel}).
 
@@ -1017,4 +1027,4 @@ do(Pid, F) ->
             {'EXIT', timeout}
     end.
 
--endif. %% -ifdef(EQC).
+-endif. %% -ifdef(GMTQC).

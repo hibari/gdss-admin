@@ -19,10 +19,20 @@
 
 -module(repair_eqc_tests).
 
--ifdef(EQC).
+-ifdef(PROPER).
+-include_lib("proper/include/proper.hrl").
+-define(GMTQC, proper).
+-undef(EQC).
+-endif. %% -ifdef(PROPER).
 
+-ifdef(EQC).
 -include_lib("eqc/include/eqc.hrl").
 -include_lib("eqc/include/eqc_statem.hrl").
+-define(GMTQC, eqc).
+-undef(PROPER).
+-endif. %% -ifdef(EQC).
+
+-ifdef(GMTQC).
 
 -compile(export_all).
 
@@ -30,7 +40,7 @@ run() ->
     run(500).
 
 run(NumTests) ->
-    eqc:module({numtests,NumTests}, ?MODULE).
+    ?GMTQC:module({numtests,NumTests}, ?MODULE).
 
 prop_repair(KeyDataFile, ChainName, HeadBrick, TailBricks) ->
     %% Setup before ?FORALL
@@ -299,4 +309,4 @@ min(_, Y)            -> Y.
 all_done() ->
     ok.
 
--endif. %% -ifdef(EQC).
+-endif. %% -ifdef(GMTQC).

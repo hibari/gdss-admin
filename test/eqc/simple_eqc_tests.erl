@@ -19,10 +19,20 @@
 
 -module(simple_eqc_tests).
 
--ifdef(EQC).
+-ifdef(PROPER).
+-include_lib("proper/include/proper.hrl").
+-define(GMTQC, proper).
+-undef(EQC).
+-endif. %% -ifdef(PROPER).
 
+-ifdef(EQC).
 -include_lib("eqc/include/eqc.hrl").
 -include_lib("eqc/include/eqc_statem.hrl").
+-define(GMTQC, eqc).
+-undef(PROPER).
+-endif. %% -ifdef(EQC).
+
+-ifdef(GMTQC).
 
 -include("brick_hash.hrl").
 -include("brick_public.hrl").
@@ -40,7 +50,7 @@
 -record(state, {
           step = 1,
           dict,                         %% key = term(),
-                                        %% val = [term()] of possible vals
+          %% val = [term()] of possible vals
           bricks                        %% list(brick_names())
          }).
 
@@ -48,7 +58,7 @@ run() ->
     run(500).
 
 run(NumTests) ->
-    eqc:module({numtests,NumTests}, ?MODULE).
+    ?GMTQC:module({numtests,NumTests}, ?MODULE).
 
 prop_simple1() ->
     common1_prop(fun(X, S) -> X == ok andalso ets_table_sizes_match_p(S) end,
@@ -78,10 +88,10 @@ prop_simple1_noproc_ok() ->
 common1_prop(F_check, Env) ->
     io:format("\n\nHibari: get_many() has been commented out from command()\n\n"),
     timer:sleep(2000),
-    ?FORALL(Cmds, eqc_statem:commands(?MODULE),
+    ?FORALL(Cmds, commands(?MODULE),
             collect({length(Cmds) div 10, div10},
                     begin
-                        {_Hist, S, Res} = eqc_statem:run_commands(?MODULE, Cmds, Env),
+                        {_Hist, S, Res} = run_commands(?MODULE, Cmds, Env),
                         ?WHENFAIL(begin
                                       %%io:format("S = ~p\nR = ~p\n", [S, Res]),
                                       io:format("S = ~p\nR = ~p\nHist = ~p\n", [S, Res, _Hist]),
@@ -672,7 +682,7 @@ stopfile_exists() ->
 
 wrap_with_stopfile(Num) when is_integer(Num) ->
     wrap_with_stopfile(
-      fun() -> eqc:quickcheck(eqc_gen:noshrink(eqc:numtests(Num, prop_simple1_noproc_ok()))) end);
+      fun() -> ?GMTQC:quickcheck(noshrink(numtests(Num, prop_simple1_noproc_ok()))) end);
 wrap_with_stopfile(Fun) when is_function(Fun) ->
     file:write_file(stopfile(), <<>>),
     Res = Fun(),
@@ -743,4 +753,4 @@ change_num_chains(Tab) ->
     brick_admin:start_migration(Tab, LH,
                                 [{max_keys_per_iter, random:uniform(5)}]).
 
--endif. %% -ifdef(EQC).
+-endif. %% -ifdef(GMTQC).

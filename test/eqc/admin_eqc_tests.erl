@@ -19,10 +19,20 @@
 
 -module(admin_eqc_tests).
 
--ifdef(EQC).
+-ifdef(PROPER).
+-include_lib("proper/include/proper.hrl").
+-define(GMTQC, proper).
+-undef(EQC).
+-endif. %% -ifdef(PROPER).
 
+-ifdef(EQC).
 -include_lib("eqc/include/eqc.hrl").
 -include_lib("eqc/include/eqc_statem.hrl").
+-define(GMTQC, eqc).
+-undef(PROPER).
+-endif. %% -ifdef(EQC).
+
+-ifdef(GMTQC).
 
 -include("brick_hash.hrl").
 
@@ -51,7 +61,7 @@ run() ->
 
 run(NumTests) ->
     brick_eunit_utils:setup_and_bootstrap(),
-    eqc:module({numtests,NumTests}, ?MODULE).
+    ?GMTQC:module({numtests,NumTests}, ?MODULE).
 
 %% props %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
 prop_0() ->
@@ -62,11 +72,11 @@ prop_0() ->
                  []).
 
 common1_prop(F_check, Env) ->
-    ?FORALL(Cmds, eqc_statem:commands(?MODULE),
+    ?FORALL(Cmds, commands(?MODULE),
             collect(length(Cmds),
                     begin
                         dbglog("======now running ~p commands=========~n",[length(Cmds)]),
-                        {_Hist, S, Res} = eqc_statem:run_commands(?MODULE, Cmds, Env),
+                        {_Hist, S, Res} = run_commands(?MODULE, Cmds, Env),
                         cleanup(S),
                         ?WHENFAIL(begin
                                       dbglog("S = ~p\nR = ~p\n", [S, Res]),
@@ -401,4 +411,4 @@ deladd() ->
     io:format("ADD:: ~p~n",[brick_admin:change_chain_length(CN, Old)]),
     io:format("---:: ~p~n", [catch brick_server:status(B, node()) ]).
 
--endif. %% -ifdef(EQC).
+-endif. %% -ifdef(GMTQC).
