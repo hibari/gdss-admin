@@ -646,7 +646,7 @@ hack_all_tab_setup(TableName, ChainLength, Nodes, BrickOptions, DoCreateAdd,
     timer:sleep(1000),
     %% Note: could use multicall here, but this whole func is a kludge.
     %% Consider using multicall elsewhere.
-    _ = [catch brick_simple:set_gh(Nd, TableName, GH)
+    _ = [catch brick_simple_client:set_gh(Nd, TableName, GH)
          || Nd <- [node()|nodes()]],
     ok.
 
@@ -1504,7 +1504,7 @@ do_spam_gh_to_all_nodes(S, DesiredTableName) ->
                               [fun() ->
                                   %% Timer hack to allow bricks to be set first
                                   timer:sleep(200),
-                                  [catch brick_simple:set_gh(
+                                  [catch brick_simple_client:set_gh(
                                            Nd, TableName, GH, 1)
                                          || Nd <- [node()|nodes()]]
                                end] ++ Acc
@@ -2269,10 +2269,10 @@ fast_sync_clone_node(DownNode, NewNode) ->
 
 fast_sync_clone_node(DownNode, NewNode, Opts) ->
     Bricks = [{Br, DownNode} ||
-                 Br <- lists:sort(brick_simple:node_to_bricks(DownNode))],
+                 Br <- lists:sort(brick_simple_client:node_to_bricks(DownNode))],
     Map = [begin
-               Tab = brick_simple:brick_to_table(Brick),
-               Chain = brick_simple:brick_to_chain(Brick),
+               Tab = brick_simple_client:brick_to_table(Brick),
+               Chain = brick_simple_client:brick_to_chain(Brick),
                {ok, GH} = brick_admin:get_gh_by_table(Tab),
                Tail = case brick_hash:chain2brick(Chain, read, GH, current) of
                           chain2brick_error ->

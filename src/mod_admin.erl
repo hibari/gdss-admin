@@ -527,7 +527,7 @@ make_root_tables(TableList) ->
                try
                    [ begin
                          {ok, Table} = brick_admin:get_table_info(Name),
-                         {ok, _, GH} = brick_simple:get_gh(Name),
+                         {ok, _, GH} = brick_simple_client:get_gh(Name),
                          LH = GH#g_hash_r.new_h_desc,
                          BrickOptions =
                              if LH#hash_r.method == chash ->
