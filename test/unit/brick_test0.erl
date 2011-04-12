@@ -1559,9 +1559,9 @@ chain_t20(OptionList) ->
 
     %% Simple, non-exhaustive testing of brick_simple interface.
 
-    brick_simple:start_link(),
+    brick_simple_client:start_link(),
     Tab = 'my-testing-tab',
-    brick_simple:unset_gh(Node, Tab),
+    brick_simple_client:unset_gh(Node, Tab),
     brick_simple_client:set_gh(Node, Tab, GH),
     %%
     {ok, _, <<"five">>} = brick_simple:get(Tab, "foo5"),
@@ -1652,9 +1652,9 @@ chain_t25(OptionList) ->
 
     F_stolen_from_chain_t20 =
         fun(MyGH) ->
-                brick_simple:start_link(),
+                brick_simple_client:start_link(),
                 Tab = 'my-testing-tab',
-                brick_simple:unset_gh(Node, Tab),
+                brick_simple_client:unset_gh(Node, Tab),
                 brick_simple_client:set_gh(Node, Tab, MyGH),
                 %%
                 {ok, _, <<"five">>} = brick_simple:get(Tab, "foo5"),
@@ -1800,7 +1800,7 @@ chain_t30(OptionList) ->
 
     start_and_flush_common_log(),
     os:cmd("rm -rf hlog.test_ch*_*"),
-    brick_simple:start_link(),
+    brick_simple_client:start_link(),
     brick_shepherd:start_link(),
 
     Tab1 = table1,
@@ -1858,7 +1858,7 @@ chain_t30(OptionList) ->
     %% Set brick_simple's view of tables.
     Tmp2 = lists:zip(Tabs, GHs),
     [begin
-         brick_simple:unset_gh(node(), Tab),
+         brick_simple_client:unset_gh(node(), Tab),
          brick_simple_client:set_gh(node(), Tab, TheGH)
      end || {Tab, TheGH} <- Tmp2],
 
@@ -1921,7 +1921,7 @@ chain_t31(OptionList) ->
 
     start_and_flush_common_log(),
     os:cmd("rm -rf hlog.test_ch*_*"),
-    brick_simple:start_link(),
+    brick_simple_client:start_link(),
     Tab1 = table1,
     Tab2 = table2,
     Tabs = [Tab1, Tab2],
@@ -1970,7 +1970,7 @@ chain_t31(OptionList) ->
     %% Set brick_simple's view of tables.
     Tmp2 = lists:zip(Tabs, GHs),
     [begin
-         brick_simple:unset_gh(node(), Tab),
+         brick_simple_client:unset_gh(node(), Tab),
          brick_simple_client:set_gh(node(), Tab, TheGH)
      end || {Tab, TheGH} <- Tmp2],
 
@@ -2029,7 +2029,7 @@ chain_t31(OptionList) ->
     %% Set brick_simple's view of tables.
     Tmp2b = lists:zip(Tabs, GHsb),
     [begin
-         brick_simple:unset_gh(node(), Tab),
+         brick_simple_client:unset_gh(node(), Tab),
          brick_simple_client:set_gh(node(), Tab, TheGH)
      end || {Tab, TheGH} <- Tmp2b],
 
@@ -2344,7 +2344,7 @@ chain_t50_common2(WhoToKill, ExitAfterKillP, OptionList) ->
                     {Br, Nd} <- Bricks]
         end,
     Fset_global_hash(GH_v1, AllBricks1),
-    brick_simple:unset_gh(node(), testtab),
+    brick_simple_client:unset_gh(node(), testtab),
     brick_simple_client:set_gh(node(), testtab, GH_v1),
 
     NumKeys = 100,
@@ -2365,7 +2365,7 @@ chain_t50_common2(WhoToKill, ExitAfterKillP, OptionList) ->
 
     [brick_server:chain_hack_set_global_hash(Br, node(), GH_v2) ||
         {_, Brs} <- Chains_1_1 ++ Chains_3_1, Br <- Brs],
-    brick_simple:unset_gh(node(), testtab),
+    brick_simple_client:unset_gh(node(), testtab),
     brick_simple_client:set_gh(node(), testtab, GH_v2),
 
     PropDelay = 30,
@@ -2517,7 +2517,7 @@ chain_t51_common(WhoToKill, ExitAfterKillP, OptionList) ->
                     {Br, Nd} <- Bricks]
         end,
     Fset_global_hash(GH_v1, AllBricks1),
-    brick_simple:unset_gh(node(), testtab),
+    brick_simple_client:unset_gh(node(), testtab),
     brick_simple_client:set_gh(node(), testtab, GH_v1),
 
     NumKeys = 100,
@@ -2540,7 +2540,7 @@ chain_t51_common(WhoToKill, ExitAfterKillP, OptionList) ->
 
     [brick_server:chain_hack_set_global_hash(Br, node(), GH_v2) ||
         {_, Brs} <- Chains_1_3 ++ Chains_3_3, Br <- Brs],
-    brick_simple:unset_gh(node(), testtab),
+    brick_simple_client:unset_gh(node(), testtab),
     brick_simple_client:set_gh(node(), testtab, GH_v2),
 
     PropDelay = 30,
@@ -3447,7 +3447,7 @@ chain_t61(OptionList) ->
                                                LHmig1, Chain1List),
     brick_server:chain_hack_set_global_hash(Name1, Node, GHmig1),
     brick_server:migration_start_sweep(Name1, Node, foocookie, Chain1Name, []),
-    brick_simple:unset_gh(Node, Tab),
+    brick_simple_client:unset_gh(Node, Tab),
     brick_simple_client:set_gh(Node, Tab, GHmig1),
 
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
@@ -3487,7 +3487,7 @@ chain_t61(OptionList) ->
     %%                                              LHmig2b, Chain2List),
     %%     brick_server:chain_hack_set_global_hash(Name1, Node, GHmig2),
     %%     brick_server:chain_hack_set_global_hash(Name2, Node, GHmig2),
-    %%     brick_simple:unset_gh(Node, Tab),
+    %%     brick_simple_client:unset_gh(Node, Tab),
     %%     brick_simple_client:set_gh(Node, Tab, GHmig2),
 
     %%     brick_server:migration_start_sweep(Name1, Node, foocookie, Chain1Name, []),
@@ -3520,7 +3520,7 @@ chain_t61(OptionList) ->
                                                LHmig3b, Chain1List),
     brick_server:chain_hack_set_global_hash(Name1, Node, GHmig3),
     brick_server:chain_hack_set_global_hash(Name2, Node, GHmig3),
-    brick_simple:unset_gh(Node, Tab),
+    brick_simple_client:unset_gh(Node, Tab),
     brick_simple_client:set_gh(Node, Tab, GHmig3),
 
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
@@ -3553,7 +3553,7 @@ chain_t61(OptionList) ->
                                                LHmig3a, Chain1List ++ Chain2List),
     brick_server:chain_hack_set_global_hash(Name1, Node, GHmig4),
     brick_server:chain_hack_set_global_hash(Name2, Node, GHmig4),
-    brick_simple:unset_gh(Node, Tab),
+    brick_simple_client:unset_gh(Node, Tab),
     brick_simple_client:set_gh(Node, Tab, GHmig4),
     SlowOpts = [{max_keys_per_iter, 5}, {propagation_delay, 500}],
     ok = brick_server:migration_start_sweep(Name1, Node, foocookie, Chain1Name,

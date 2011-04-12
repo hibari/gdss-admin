@@ -38,7 +38,7 @@ setup(Verbose) ->
     case net_kernel:start([?MYNODE, shortnames]) of
         {ok, _} ->
             ok;
-        {error, {{already_started, _}, _}} ->
+        {error, {already_started, _}} ->
             ok
     end,
     [ application:load(A) || A <- ?APPS ],
