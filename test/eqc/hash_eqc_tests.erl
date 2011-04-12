@@ -39,7 +39,7 @@ run() ->
     run(30000).
 
 run(NumTests) ->
-    ?GMTQC:module({numtests,NumTests}, ?MODULE).
+    gmt_eqc:module({numtests,NumTests}, ?MODULE).
 
 %%-define(MARGIN, 0.0000000000000001). % fails
 -define(MARGIN, 0.00000000000001).   % works

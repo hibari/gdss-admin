@@ -61,7 +61,7 @@ run() ->
 
 run(NumTests) ->
     brick_eunit_utils:setup_and_bootstrap(),
-    ?GMTQC:module({numtests,NumTests}, ?MODULE).
+    gmt_eqc:module({numtests,NumTests}, ?MODULE).
 
 %% props %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
 prop_0() ->

@@ -63,7 +63,7 @@ run() ->
     run(500).
 
 run(NumTests) ->
-    ?GMTQC:module({numtests,NumTests}, ?MODULE).
+    gmt_eqc:module({numtests,NumTests}, ?MODULE).
 
 prop_local_log() ->
     io:format("\n\nNOTE: GDSS app can't be running while this test runs.\n"),

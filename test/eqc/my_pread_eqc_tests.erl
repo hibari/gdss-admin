@@ -42,7 +42,7 @@ run() ->
     run(500).
 
 run(NumTests) ->
-    ?GMTQC:module({numtests,NumTests}, ?MODULE).
+    gmt_eqc:module({numtests,NumTests}, ?MODULE).
 
 -record(state, {
           size_f1,
