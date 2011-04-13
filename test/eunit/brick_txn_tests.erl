@@ -75,11 +75,11 @@ test_simple_txnset1() ->
     SetA = brick_server:make_set(KeyA, TS2, ValB, 0, []),
     TS3 = 2,
     SetB = brick_server:make_set(KeyB, TS3, ValA, 0, []),
-    [{ts_error,TS1}, ok] = brick_simple:do(tab1, [txn, SetA, SetB]),
+    {txn_fail, [{1,{ts_error,TS1}}]} =
+        brick_simple:do(tab1, [txn, SetA, SetB]),
 
     %% get_many
     {ok, {[{KeyA, TS1, ValA, 0, [{val_len,ValALen}]}
-           , {KeyB, TS3, ValA, 0, [{val_len,ValALen}]} %% TODO: bug!
           ], false}} = brick_simple:get_many(tab1, KeyPrefix, 100),
 
     ok.
@@ -113,11 +113,11 @@ test_simple_txnset2a() ->
     SetA = brick_server:make_set(KeyA, TS2, ValB, 0, []),
     TS3 = 2,
     SetB = brick_server:make_set(KeyB, TS3, ValA, 0, []),
-    [{ts_error,TS1}, ok] = brick_simple:do(tab1, [txn, SetA, SetB]),
+    {txn_fail, [{1,{ts_error,TS1}}]} =
+        brick_simple:do(tab1, [txn, SetA, SetB]),
 
     %% get_many
     {ok, {[{KeyA, TS1, ValA, 0, [{val_len,ValALen}]}
-           , {KeyB, TS3, ValA, 0, [{val_len,ValALen}]} %% TODO: bug!
           ], false}} = brick_simple:get_many(tab1, KeyPrefix, 100),
 
     ok.
@@ -266,11 +266,11 @@ test_simple_txnset1r() ->
     SetA = brick_server:make_set(KeyA, TS2, ValB, 0, []),
     TS3 = 2,
     SetB = brick_server:make_set(KeyB, TS3, ValA, 0, []),
-    [ok, {ts_error,TS1}] = brick_simple:do(tab1, [txn, SetB, SetA]),
+    {txn_fail, [{2,{ts_error,TS1}}]} =
+        brick_simple:do(tab1, [txn, SetB, SetA]),
 
     %% get_many
     {ok, {[{KeyA, TS1, ValA, 0, [{val_len,ValALen}]}
-           , {KeyB, TS3, ValA, 0, [{val_len,ValALen}]} %% TODO: bug!
           ], false}} = brick_simple:get_many(tab1, KeyPrefix, 100),
 
     ok.
@@ -304,11 +304,11 @@ test_simple_txnset2ar() ->
     SetA = brick_server:make_set(KeyA, TS2, ValB, 0, []),
     TS3 = 2,
     SetB = brick_server:make_set(KeyB, TS3, ValA, 0, []),
-    [ok, {ts_error,TS1}] = brick_simple:do(tab1, [txn, SetB, SetA]),
+    {txn_fail, [{2,{ts_error,TS2}}]} =
+        brick_simple:do(tab1, [txn, SetB, SetA]),
 
     %% get_many
     {ok, {[{KeyA, TS1, ValA, 0, [{val_len,ValALen}]}
-           , {KeyB, TS3, ValA, 0, [{val_len,ValALen}]} %% TODO: bug!
           ], false}} = brick_simple:get_many(tab1, KeyPrefix, 100),
 
     ok.
