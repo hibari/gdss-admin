@@ -27,11 +27,16 @@ all_tests_test_() ->
      fun test_setup/0,
      fun test_teardown/1,
      [
-      ?_test(test_simple_txn1())
-      , ?_test(test_simple_txn2a())
-      , ?_test(test_simple_txn2b())
-      , ?_test(test_simple_txn3a())
-      , ?_test(test_simple_txn3b())
+      ?_test(test_simple_txnset1())
+      , ?_test(test_simple_txnset2a())
+      , ?_test(test_simple_txnset2b())
+      , ?_test(test_simple_txnset3a())
+      , ?_test(test_simple_txnset3b())
+      , ?_test(test_simple_txnset1r())
+      , ?_test(test_simple_txnset2ar())
+      , ?_test(test_simple_txnset2br())
+      , ?_test(test_simple_txnset3ar())
+      , ?_test(test_simple_txnset3br())
      ]}.
 
 test_setup() ->
@@ -43,7 +48,7 @@ test_teardown(X) ->
 
 %% @doc set transaction with TS less than old timestamp ... this
 %% should fail
-test_simple_txn1() ->
+test_simple_txnset1() ->
     KeyPrefix = <<"/100/1">>,
 
     KeyA = <<"/100/1/A">>,
@@ -81,7 +86,7 @@ test_simple_txn1() ->
 
 %% @doc set transaction with TS equal to old timestamp but different
 %% value ... this should fail
-test_simple_txn2a() ->
+test_simple_txnset2a() ->
     KeyPrefix = <<"/100/1">>,
 
     KeyA = <<"/100/1/A">>,
@@ -119,7 +124,7 @@ test_simple_txn2a() ->
 
 %% @doc set transaction with TS equal to old timestamp but same
 %% value ... this should succeed
-test_simple_txn2b() ->
+test_simple_txnset2b() ->
     KeyPrefix = <<"/100/1">>,
 
     KeyA = <<"/100/1/A">>,
@@ -157,7 +162,7 @@ test_simple_txn2b() ->
 
 %% @doc set transaction with TS larger than old timestamp but different
 %% value ... this should succeed
-test_simple_txn3a() ->
+test_simple_txnset3a() ->
     KeyPrefix = <<"/100/1">>,
 
     KeyA = <<"/100/1/A">>,
@@ -195,7 +200,7 @@ test_simple_txn3a() ->
 
 %% @doc set transaction with TS larger than old timestamp but same
 %% value ... this should succeed
-test_simple_txn3b() ->
+test_simple_txnset3b() ->
     KeyPrefix = <<"/100/1">>,
 
     KeyA = <<"/100/1/A">>,
@@ -223,6 +228,197 @@ test_simple_txn3b() ->
     TS3 = 2,
     SetB = brick_server:make_set(KeyB, TS3, ValA, 0, []),
     [ok, ok] = brick_simple:do(tab1, [txn, SetA, SetB]),
+
+    %% get_many
+    {ok, {[{KeyA, TS2, ValA, 0, [{val_len,ValALen}]}
+           , {KeyB, TS3, ValA, 0, [{val_len,ValALen}]}
+          ], false}} = brick_simple:get_many(tab1, KeyPrefix, 100),
+
+    ok.
+
+
+%% @doc reverse order set transaction with TS less than old timestamp
+%% ... this should fail
+test_simple_txnset1r() ->
+    KeyPrefix = <<"/100/1">>,
+
+    KeyA = <<"/100/1/A">>,
+    ValA = <<"AAA">>,
+    ValALen = byte_size(ValA),
+
+    KeyB = <<"/100/1/B">>,
+    ValB = <<"BBB">>,
+    _ValBLen = byte_size(ValB),
+
+    %% reset
+    _ = brick_simple:delete(tab1, KeyA),
+    _ = brick_simple:delete(tab1, KeyB),
+
+    %% add KeyA
+    ok = brick_simple:add(tab1, KeyA, ValA),
+
+    %% get_many
+    {ok, {[{KeyA, TS1, ValA, 0, [{val_len,ValALen}]}], false}} =
+        brick_simple:get_many(tab1, KeyPrefix, 100),
+
+    %% txn set KeyA and set KeyB
+    TS2 = 1,
+    SetA = brick_server:make_set(KeyA, TS2, ValB, 0, []),
+    TS3 = 2,
+    SetB = brick_server:make_set(KeyB, TS3, ValA, 0, []),
+    [ok, {ts_error,TS1}] = brick_simple:do(tab1, [txn, SetB, SetA]),
+
+    %% get_many
+    {ok, {[{KeyA, TS1, ValA, 0, [{val_len,ValALen}]}
+           , {KeyB, TS3, ValA, 0, [{val_len,ValALen}]} %% TODO: bug!
+          ], false}} = brick_simple:get_many(tab1, KeyPrefix, 100),
+
+    ok.
+
+%% @doc reverse order set transaction with TS equal to old timestamp
+%% but different value ... this should fail
+test_simple_txnset2ar() ->
+    KeyPrefix = <<"/100/1">>,
+
+    KeyA = <<"/100/1/A">>,
+    ValA = <<"AAA">>,
+    ValALen = byte_size(ValA),
+
+    KeyB = <<"/100/1/B">>,
+    ValB = <<"BBB">>,
+    _ValBLen = byte_size(ValB),
+
+    %% reset
+    _ = brick_simple:delete(tab1, KeyA),
+    _ = brick_simple:delete(tab1, KeyB),
+
+    %% add KeyA
+    ok = brick_simple:add(tab1, KeyA, ValA),
+
+    %% get_many
+    {ok, {[{KeyA, TS1, ValA, 0, [{val_len,ValALen}]}], false}} =
+        brick_simple:get_many(tab1, KeyPrefix, 100),
+
+    %% txn set KeyA and set KeyB
+    TS2 = TS1,
+    SetA = brick_server:make_set(KeyA, TS2, ValB, 0, []),
+    TS3 = 2,
+    SetB = brick_server:make_set(KeyB, TS3, ValA, 0, []),
+    [ok, {ts_error,TS1}] = brick_simple:do(tab1, [txn, SetB, SetA]),
+
+    %% get_many
+    {ok, {[{KeyA, TS1, ValA, 0, [{val_len,ValALen}]}
+           , {KeyB, TS3, ValA, 0, [{val_len,ValALen}]} %% TODO: bug!
+          ], false}} = brick_simple:get_many(tab1, KeyPrefix, 100),
+
+    ok.
+
+%% @doc set transaction with TS equal to old timestamp but same
+%% value ... this should succeed
+test_simple_txnset2br() ->
+    KeyPrefix = <<"/100/1">>,
+
+    KeyA = <<"/100/1/A">>,
+    ValA = <<"AAA">>,
+    ValALen = byte_size(ValA),
+
+    KeyB = <<"/100/1/B">>,
+    ValB = <<"BBB">>,
+    _ValBLen = byte_size(ValB),
+
+    %% reset
+    _ = brick_simple:delete(tab1, KeyA),
+    _ = brick_simple:delete(tab1, KeyB),
+
+    %% add KeyA
+    ok = brick_simple:add(tab1, KeyA, ValA),
+
+    %% get_many
+    {ok, {[{KeyA, TS1, ValA, 0, [{val_len,ValALen}]}], false}} =
+        brick_simple:get_many(tab1, KeyPrefix, 100),
+
+    %% txn set KeyA and set KeyB
+    TS2 = TS1,
+    SetA = brick_server:make_set(KeyA, TS2, ValA, 0, []),
+    TS3 = 2,
+    SetB = brick_server:make_set(KeyB, TS3, ValA, 0, []),
+    [ok, ok] = brick_simple:do(tab1, [txn, SetB, SetA]),
+
+    %% get_many
+    {ok, {[{KeyA, TS1, ValA, 0, [{val_len,ValALen}]}
+           , {KeyB, TS3, ValA, 0, [{val_len,ValALen}]}
+          ], false}} = brick_simple:get_many(tab1, KeyPrefix, 100),
+
+    ok.
+
+%% @doc reverse order set transaction with TS larger than old
+%% timestamp but different value ... this should succeed
+test_simple_txnset3ar() ->
+    KeyPrefix = <<"/100/1">>,
+
+    KeyA = <<"/100/1/A">>,
+    ValA = <<"AAA">>,
+    ValALen = byte_size(ValA),
+
+    KeyB = <<"/100/1/B">>,
+    ValB = <<"BBB">>,
+    ValBLen = byte_size(ValB),
+
+    %% reset
+    _ = brick_simple:delete(tab1, KeyA),
+    _ = brick_simple:delete(tab1, KeyB),
+
+    %% add KeyA
+    ok = brick_simple:add(tab1, KeyA, ValA),
+
+    %% get_many
+    {ok, {[{KeyA, TS1, ValA, 0, [{val_len,ValALen}]}], false}} =
+        brick_simple:get_many(tab1, KeyPrefix, 100),
+
+    %% txn set KeyA and set KeyB
+    TS2 = TS1+1,
+    SetA = brick_server:make_set(KeyA, TS2, ValB, 0, []),
+    TS3 = 2,
+    SetB = brick_server:make_set(KeyB, TS3, ValA, 0, []),
+    [ok, ok] = brick_simple:do(tab1, [txn, SetB, SetA]),
+
+    %% get_many
+    {ok, {[{KeyA, TS2, ValB, 0, [{val_len,ValBLen}]}
+           , {KeyB, TS3, ValA, 0, [{val_len,ValALen}]}
+          ], false}} = brick_simple:get_many(tab1, KeyPrefix, 100),
+
+    ok.
+
+%% @doc reverse order set transaction with TS larger than old
+%% timestamp but same value ... this should succeed
+test_simple_txnset3br() ->
+    KeyPrefix = <<"/100/1">>,
+
+    KeyA = <<"/100/1/A">>,
+    ValA = <<"AAA">>,
+    ValALen = byte_size(ValA),
+
+    KeyB = <<"/100/1/B">>,
+    ValB = <<"BBB">>,
+    _ValBLen = byte_size(ValB),
+
+    %% reset
+    _ = brick_simple:delete(tab1, KeyA),
+    _ = brick_simple:delete(tab1, KeyB),
+
+    %% add KeyA
+    ok = brick_simple:add(tab1, KeyA, ValA),
+
+    %% get_many
+    {ok, {[{KeyA, TS1, ValA, 0, [{val_len,ValALen}]}], false}} =
+        brick_simple:get_many(tab1, KeyPrefix, 100),
+
+    %% txn set KeyA and set KeyB
+    TS2 = TS1+1,
+    SetA = brick_server:make_set(KeyA, TS2, ValA, 0, []),
+    TS3 = 2,
+    SetB = brick_server:make_set(KeyB, TS3, ValA, 0, []),
+    [ok, ok] = brick_simple:do(tab1, [txn, SetB, SetA]),
 
     %% get_many
     {ok, {[{KeyA, TS2, ValA, 0, [{val_len,ValALen}]}
