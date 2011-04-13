@@ -39,6 +39,9 @@ setup(Verbose) ->
         {ok, _} ->
             ok;
         {error, {already_started, _}} ->
+            ok;
+        {error, {{already_started, _}, _}} ->
+            %% TODO: doesn't match documentation
             ok
     end,
     [ application:load(A) || A <- ?APPS ],
