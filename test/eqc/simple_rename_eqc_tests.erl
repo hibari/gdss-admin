@@ -53,13 +53,15 @@
 
 -spec rename(table(), key(), key(), time_t(), [rename_flag()], timeout()) -> rename_reply().
 
-%% @doc This function renames an existing value corresponding to
-%% OldKey to new Key and deletes the OldKey. Flags of the OldKey are
-%% ignored and replaced with the Flags argument (except for 'testset'
-%% flag).  If OldKey doesn't exist, return 'key_not_exist'.  If OldKey
-%% exists, Flags contains {'testset', timestamp()}, and there is a
-%% timestamp mismatch with the OldKey, return {'ts_error',
-%% timestamp()}.  If Key exists, return {'key_exists',timestamp()}.
+%% @doc
+%% - This function renames an existing value corresponding to OldKey to
+%%   new Key and deletes the OldKey.  Flags of the OldKey are ignored and
+%%   replaced with the Flags argument (except for `'testset'` flag).
+%% - If OldKey doesn't exist, return `'key_not_exist'`.
+%% - If OldKey exists, Flags contains `{'testset', timestamp()}`, and
+%%   there is a timestamp mismatch with the OldKey, return `{'ts_error',
+%%   timestamp()}`.
+%% - If Key exists, return `{'key_exists',timestamp()}`.
 
 rename(Tab, OldKey, Key, ExpTime, Flags, Timeout) ->
     GetFlags =
@@ -70,7 +72,7 @@ rename(Tab, OldKey, Key, ExpTime, Flags, Timeout) ->
                 [Flag]
         end,
     case brick_simple:get(Tab, OldKey, GetFlags, Timeout) of
-        {ok, _TS, Val, _ExpTime, _Flags} ->
+        {ok, _TS, Val} ->
             AddFlags = proplists:delete(testset, Flags),
             brick_simple:add(Tab, Key, Val, ExpTime, AddFlags, Timeout);
         Err ->
