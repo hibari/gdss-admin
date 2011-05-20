@@ -1628,8 +1628,8 @@ do_change_chain_length(ChainName, NewBrickList, S) ->
                     %% OK, now that we've updated our schema in
                     %% persistent storage, time to take action.
                     ChainMonName = brick_chainmon:chain2name(ChainName),
-                    ok = supervisor:terminate_child(brick_mon_sup, ChainMonName),
-                    ok = supervisor:delete_child(brick_mon_sup, ChainMonName),
+                    ok = sup_stop_status(supervisor:terminate_child(brick_mon_sup, ChainMonName)),
+                    ok = sup_stop_status(supervisor:delete_child(brick_mon_sup, ChainMonName)),
                     timer:sleep(1*1000),
                     %% This will do a lot of extra work for stuff
                     %% already running, but that's OK.
@@ -1840,18 +1840,28 @@ stop_old_chains_and_bricks(OldOnlyChNames, OldOnlyBricks) ->
 stop_chmon(ChainName) ->
     MonName = brick_chainmon:chain2name(ChainName),
     ?ELOG_INFO("stop_chmon: stopping ~p", [MonName]),
-    ok = sup_stop_status(supervisor:terminate_child(brick_mon_sup, MonName)),
-    ok = sup_stop_status(supervisor:delete_child(brick_mon_sup, MonName)),
-    ok.
+    try
+        ok = sup_stop_status(supervisor:terminate_child(brick_mon_sup, MonName)),
+        ok = sup_stop_status(supervisor:delete_child(brick_mon_sup, MonName)),
+        ok
+    catch
+        exit:noproc ->
+            ok
+    end.
 
 %% @doc Stop a brick pinger process.
 
 stop_bp(BrickName, BrickNode) ->
     MonName = brick_bp:make_pinger_registered_name(BrickName),
     ?ELOG_INFO("stop_bp: stopping ~p on ~p", [MonName,BrickNode]),
-    ok = sup_stop_status(supervisor:terminate_child({brick_mon_sup, BrickNode}, MonName)),
-    ok = sup_stop_status(supervisor:delete_child({brick_mon_sup, BrickNode}, MonName)),
-    ok.
+    try
+        ok = sup_stop_status(supervisor:terminate_child({brick_mon_sup, BrickNode}, MonName)),
+        ok = sup_stop_status(supervisor:delete_child({brick_mon_sup, BrickNode}, MonName)),
+        ok
+    catch
+        exit:noproc ->
+            ok
+    end.
 
 %% @doc Stop a brick and delete its local log.
 
@@ -2115,16 +2125,18 @@ do_delete_client_monitor(Node) ->
     Res = do_mod_client_monitor(Node, fun(Nd, OldList) -> OldList -- [Nd] end),
     ?ELOG_INFO("Deleting client monitors for node ~p: ~p",
                [Node, Res]),
-    _ = [begin
-             Name = client_monitor_name(Node, AppName),
-             case (catch supervisor:terminate_child(brick_mon_sup, Name)) of
-                 ok ->
-                     gmt_util:clear_alarm({client_node_down, Node}, fun() -> ok end),
-                     catch supervisor:delete_child(brick_mon_sup, Name);
-                 Err ->
-                     Err
-             end
-         end || AppName <- client_mon_app_names()],
+    [begin
+         Name = client_monitor_name(Node, AppName),
+         try
+             ok = sup_stop_status(supervisor:terminate_child(brick_mon_sup, Name)),
+             gmt_util:clear_alarm({client_node_down, Node}, fun() -> ok end),
+             ok = sup_stop_status(supervisor:delete_child(brick_mon_sup, Name)),
+             ok
+         catch
+             exit:noproc ->
+                 ok
+         end
+     end || AppName <- client_mon_app_names()],
     Res.
 
 client_mon_app_names() ->

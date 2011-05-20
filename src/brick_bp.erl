@@ -103,16 +103,18 @@ start_pingers(Bricks, BrickOptions) ->
       end, Bricks),
     ok.
 
-%% @spec (atom()) -> ok | {error, term()}
+%% @spec (atom()) -> ok
 %% @doc Stop an individual pinger, must be run on same node as pinger.
 
 stop_pinger(Name) ->
     RegName = make_pinger_registered_name(Name),
-    case (catch supervisor:terminate_child(brick_mon_sup, RegName)) of
-        ok ->
-            catch supervisor:delete_child(brick_mon_sup, RegName);
-        Err ->
-            Err
+    try
+        ok = sup_stop_status(supervisor:terminate_child(brick_mon_sup, RegName)),
+        ok = sup_stop_status(supervisor:delete_child(brick_mon_sup, RegName)),
+        ok
+    catch
+        exit:noproc ->
+            ok
     end.
 
 state(Pid) ->
@@ -549,3 +551,7 @@ call_with_timeout_repeat(Fun, N, Timeout) when N > 0 ->
             timer:sleep(Timeout),
             call_with_timeout_repeat(Fun, N - 1, Timeout)
     end.
+
+sup_stop_status(ok) ->                 ok;
+sup_stop_status({error, not_found}) -> ok;
+sup_stop_status(X) ->                  X.
