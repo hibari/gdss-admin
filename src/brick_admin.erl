@@ -2125,18 +2125,18 @@ do_delete_client_monitor(Node) ->
     Res = do_mod_client_monitor(Node, fun(Nd, OldList) -> OldList -- [Nd] end),
     ?ELOG_INFO("Deleting client monitors for node ~p: ~p",
                [Node, Res]),
-    [begin
-         Name = client_monitor_name(Node, AppName),
-         try
-             ok = sup_stop_status(supervisor:terminate_child(brick_mon_sup, Name)),
-             gmt_util:clear_alarm({client_node_down, Node}, fun() -> ok end),
-             ok = sup_stop_status(supervisor:delete_child(brick_mon_sup, Name)),
-             ok
-         catch
-             exit:noproc ->
+    _ = [begin
+             Name = client_monitor_name(Node, AppName),
+             try
+                 ok = sup_stop_status(supervisor:terminate_child(brick_mon_sup, Name)),
+                 gmt_util:clear_alarm({client_node_down, Node}, fun() -> ok end),
+                 ok = sup_stop_status(supervisor:delete_child(brick_mon_sup, Name)),
                  ok
-         end
-     end || AppName <- client_mon_app_names()],
+             catch
+                 exit:noproc ->
+                     ok
+             end
+         end || AppName <- client_mon_app_names()],
     Res.
 
 client_mon_app_names() ->
