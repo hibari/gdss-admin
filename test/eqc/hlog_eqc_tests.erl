@@ -251,9 +251,10 @@ my_duplicate(0, _) ->
 my_duplicate(N, X) ->
     lists:duplicate(N, X).
 
-start_server(FileLenLimit, WriteSleep, SyncSleep) ->
+start_server(FileLenMax, WriteSleep, SyncSleep) ->
     {ok, Pid} = ?MUT:start_link([{name, ?TEST_NAME},
-                                 {file_len_limit, FileLenLimit*1024},
+                                 {file_len_max, FileLenMax*1024},
+                                 {file_len_min, FileLenMax*1024},
                                  {debug_write_sleep, WriteSleep},
                                  {debug_sync_sleep, SyncSleep}]),
     Pid.

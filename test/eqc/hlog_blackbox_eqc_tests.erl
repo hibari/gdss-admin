@@ -365,7 +365,8 @@ command_typegen(_Mod,_S,props) ->
     ?LET(Server,command_typegen(_Mod,_S,servername),
          ?LET(Bytes,command_typegen(_Mod,_S,bytes),
               [{name,Server}
-               , {file_len_limit,1+((Bytes+1)*?FILELENFACTOR)}
+               , {file_len_max,1+((Bytes+1)*?FILELENFACTOR)}
+               , {file_len_min,1+((Bytes+1)*?FILELENFACTOR)}
                , {long_h1_size,int()}
                , {long_h2_size,int()}]));
 command_typegen(_Mod,_S,seqnum) ->
@@ -866,9 +867,9 @@ is_alive(S,Pid) ->
 
 is_write_hunk_ok(S,Pid,#hunk{len=Len}) ->
     [Props] = [ P || #server{pid=Pid1,props=P} <- S#state.servers, Pid=:=Pid1 ],
-    FileLenLimit = proplists:get_value(file_len_limit,Props),
-    %% ASSUMPTION: file_len_limit is larger than 32
-    if Len > FileLenLimit - (32) -> % fudge factor!
+    FileLenMax = proplists:get_value(file_len_max,Props),
+    %% ASSUMPTION: file_len_max is larger than 32
+    if Len > FileLenMax - (32) -> % fudge factor!
             {hunk_too_big, Len};
        true ->
             true
