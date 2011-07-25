@@ -40,7 +40,7 @@
                      | value_in_ram
                      | attr().
 
--type rename_reply() :: {ok, ts()} | key_not_exist | {ts_error, ts()} | {key_exists, ts()}.
+-type rename_reply() :: {ok, ts()} | key_not_exist | {ts_error, ts()}.
 
 %%====================================================================
 %% Types - internal
@@ -54,16 +54,17 @@
 -spec rename(table(), key(), key(), time_t(), [rename_flag()], timeout()) -> rename_reply().
 
 %% @doc
-%% - This function renames an existing value corresponding to OldKey to
-%%   new Key and deletes the OldKey.  Flags of the OldKey are ignored and
-%%   replaced with the Flags argument (except for `'testset'` flag).
-%% - If OldKey doesn't exist, return `'key_not_exist'`.
-%% - If OldKey exists, Flags contains `{'testset', timestamp()}`, and
-%%   there is a timestamp mismatch with the OldKey, return `{'ts_error',
+%% - This function renames an existing value corresponding to Key to
+%%   NewKey and deletes the Key.
+%% - If Key doesn't exist or Key and NewKey are same, return
+%%   `'key_not_exist'`.
+%% - If Flags contains `{'testset', timestamp()}`, and there is a
+%%   timestamp mismatch with the Key, return `{'ts_error',
 %%   timestamp()}`.
-%% - If Key exists, return `{'key_exists',timestamp()}`.
 
-rename(Tab, OldKey, Key, ExpTime, Flags, Timeout) ->
+rename(_Tab, Key, Key, _ExpTime, _Flags, _Timeout) ->
+    key_not_exist;
+rename(Tab, Key, NewKey, ExpTime, Flags, Timeout) ->
     GetFlags =
         case proplists:lookup(testset, Flags) of
             none ->
@@ -71,10 +72,12 @@ rename(Tab, OldKey, Key, ExpTime, Flags, Timeout) ->
             Flag ->
                 [Flag]
         end,
-    case brick_simple:get(Tab, OldKey, GetFlags, Timeout) of
+    case brick_simple:get(Tab, Key, GetFlags, Timeout) of
         {ok, _TS, Val} ->
-            AddFlags = proplists:delete(testset, Flags),
-            brick_simple:add(Tab, Key, Val, ExpTime, AddFlags, Timeout);
+            SetFlags = proplists:delete(testset, Flags),
+            Res = brick_simple:set(Tab, NewKey, Val, ExpTime, SetFlags, Timeout),
+            brick_simple:delete(Tab, Key, Timeout),
+            Res;
         Err ->
             Err
     end.

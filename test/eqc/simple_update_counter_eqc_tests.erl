@@ -13,8 +13,8 @@
 %%% See the License for the specific language governing permissions and
 %%% limitations under the License.
 %%%
-%%% File    : simple_rename_eqc_tests.erl
-%%% Purpose : Simple test to illustrate a client-based rename
+%%% File    : simple_update_counter_eqc_tests.erl
+%%% Purpose : Simple test to illustrate a client-based counter
 %%%           implementation.
 %%%-------------------------------------------------------------------
 
