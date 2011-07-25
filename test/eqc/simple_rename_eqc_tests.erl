@@ -40,7 +40,7 @@
                      | value_in_ram
                      | attr().
 
--type rename_reply() :: ok | key_not_exist | {ts_error, ts()} | {key_exists, ts()}.
+-type rename_reply() :: {ok, ts()} | key_not_exist | {ts_error, ts()} | {key_exists, ts()}.
 
 %%====================================================================
 %% Types - internal

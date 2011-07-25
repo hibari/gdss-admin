@@ -269,7 +269,7 @@ postcondition2(S, {call, _, simple_add, [Key, _Val, _Exp, _Flags]} = _C, R) ->
         %%          Vs /= [];
         {key_exists, _TS} ->
             has_one_definite_or_maybe_val(Vs);
-        ok ->
+        {ok, _TS} ->
             has_zero_definite_vals(Vs)
     end;
 postcondition2(S, {call, _, simple_replace, [Key, _Val, _Exp, _Flags]} = _C, R) ->
@@ -280,7 +280,7 @@ postcondition2(S, {call, _, simple_replace, [Key, _Val, _Exp, _Flags]} = _C, R) 
         %%          Vs == [];
         key_not_exist ->
             has_zero_definite_vals(Vs);
-        ok ->
+        {ok, _TS} ->
             has_one_definite_or_maybe_val(Vs)
     end;
 postcondition2(S, {call, _, simple_get, [Key, Flags]} = _C, R) ->
@@ -371,7 +371,7 @@ next_state(S, R, C) ->
 
 next_state2(S, Result, {call, _, simple_set, [Key, Val, _Exp, _Flags]}) ->
     Old = orddict:fetch(Key, S#state.dict),
-    New = case Result of ok          -> [Val];
+    New = case Result of {ok, _TS} -> [Val];
               {'EXIT', _} -> [{maybe_set, Val}|Old]
           end,
     S#state{dict = orddict:store(Key, New, S#state.dict)};
@@ -530,7 +530,7 @@ calc_state_usage(S) ->
 calc_actual_usage(QRoot) ->
     {ok, {All, false}} = brick_simple:get_many(?TABLE, QRoot, ?MAX_KEYS+70,
                                                [{binary_prefix, QRoot}]),
-    Vals = [V || {_K, _TS, V, _Exp, _Fs} <- All],
+    Vals = [V || {_K, _TS, V} <- All],
     Items = length(Vals),
     Bytes = lists:foldl(fun(X, Sum) -> size(X) + Sum end, 0, Vals),
     {Items, Bytes}.

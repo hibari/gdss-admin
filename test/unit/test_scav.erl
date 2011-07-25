@@ -100,7 +100,7 @@ test_get_many(Tab) ->
     TestFun0 =
     fun(_) ->
         case catch brick_simple:get_many(Tab, <<"1">>, 1,[get_many_raw_storetuples,ignore_role], ?TOUTSEC) of
-            {ok,_} ->
+            {ok, _} ->
             true;
             {'EXIT', {timeout, _}} ->
             io:format(":::get_many: timeout ################~n"),
@@ -287,7 +287,7 @@ init0() ->
     start_admin(list_to_atom(MyBase++"_"++"bootstrap"),SchemaFile),
     create_table(Tab),
     timer:sleep(5000),
-    ok = brick_simple:add(Tab, ?BIGKEY, BigBin, ?TOUTSEC),
+    {ok, _} = brick_simple:add(Tab, ?BIGKEY, BigBin, ?TOUTSEC),
     Tab.
 
 init1(Num,BinSize,PerCent,StartKey,Tab) ->

@@ -189,11 +189,27 @@ delete_ir2(Br, Nd, Keys) ->
 
 set_ir(Br, Nd, Key, Val) ->
     [Res] = set_ir2(Br, Nd, [{Key, Val}]),
-    Res.
+    case Res of
+        {ok, _} ->
+            ok;
+        _ ->
+            Res
+    end.
 
 set_ir2(Br, Nd, KVs) ->
     Ops = [brick_server:make_set(Key, Val) || {Key, Val} <- KVs],
-    brick_server:do(Br, Nd, Ops, [ignore_role], 60*1000).
+    Res = brick_server:do(Br, Nd, Ops, [ignore_role], 60*1000),
+    case Res of
+        X when is_list(X) ->
+            [ case R of
+                  {ok, _} ->
+                      ok;
+                  _ ->
+                      R
+              end || R <- Res ];
+        _ ->
+            Res
+    end.
 
 make_old_ir(Br, Nd, Key, Val) ->
     [Res] = make_old_ir2(Br, Nd, [{Key, Val}]),
@@ -203,7 +219,18 @@ make_old_ir2(Br, Nd, KVs) ->
     _XX1 = delete_ir2(Br, Nd, [Key || {Key, _} <- KVs]),
     Ops = [brick_server:make_op6(set, Key, 4242, Val, 0, []) ||
               {Key, Val} <- KVs],
-    brick_server:do(Br, Nd, Ops, [ignore_role], 60*1000).
+    Res = brick_server:do(Br, Nd, Ops, [ignore_role], 60*1000),
+    case Res of
+        X when is_list(X) ->
+            [ case R of
+                  {ok, _} ->
+                      ok;
+                  _ ->
+                      R
+              end || R <- Res ];
+        _ ->
+            Res
+    end.
 
 delete_keys_ir(Br, Nd, DelIdx, KeysT) ->
     Keys = [begin {Key, _TS} = element(Idx, KeysT), Key end || Idx <- DelIdx],

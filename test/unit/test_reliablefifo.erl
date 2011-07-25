@@ -283,7 +283,7 @@ bootstrap_chain() ->
 
     [] = os:cmd("rm -rf hlog." ++ Boot0),
     [] = os:cmd("rm -f " ++ SchemaFile),
-    {1,{ok,_}} = {1,brick_admin:create_new_schema([{list_to_atom(Boot0),
+    {1,{ok, _}} = {1,brick_admin:create_new_schema([{list_to_atom(Boot0),
                                                     adminnode()}],
                                                   SchemaFile)},
     io:format(":::admin starting with ~p~n",[SchemaFile]),

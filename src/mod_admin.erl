@@ -1259,13 +1259,14 @@ get_change_client_monitor(Query, ModData) ->
                             throw(invalid_node_name)
                     end
             end,
-        if Op == "add" ->
-                ok = brick_admin:add_client_monitor(Node);
-           Op == "delete" ->
-                ok = brick_admin:delete_client_monitor(Node);
-           true ->
-                throw({bad_op, Op})
-        end,
+        _ =
+            if Op == "add" ->
+                    {ok, _} = brick_admin:add_client_monitor(Node);
+               Op == "delete" ->
+                    {ok, _} = brick_admin:delete_client_monitor(Node);
+               true ->
+                    throw({bad_op, Op})
+            end,
         Head = [
                 "<html>\r\n",
                 "  <head><link rel='stylesheet' type='text/css' href='/css/admin.css' /><title>Operation was successful</title></head>\r\n"],

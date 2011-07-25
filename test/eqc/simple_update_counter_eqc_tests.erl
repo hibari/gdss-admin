@@ -108,7 +108,7 @@ update_counter2(Tab, Key, Incr, Timeout, Expires) ->
             NewIntVal = update_counter_value(0, Incr),
             NewVal = integer_to_binary(NewIntVal),
             case brick_simple:add(Tab, Key, NewVal, 0, [], Timeout) of
-                ok ->
+                {ok, _} ->
                     {ok, NewIntVal};
                 key_exists ->
                     %% retry
