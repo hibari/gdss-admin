@@ -129,7 +129,7 @@ update_counter_value(Val, Incr) ->
     end.
 
 binary_to_integer(X) ->
-    erlang:list_to_integert(erlang:binary_to_list(X)).
+    erlang:list_to_integer(erlang:binary_to_list(X)).
 
 integer_to_binary(X) ->
     erlang:list_to_binary(erlang:integer_to_list(X)).
