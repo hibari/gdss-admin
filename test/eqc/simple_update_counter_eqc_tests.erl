@@ -13,8 +13,8 @@
 %%% See the License for the specific language governing permissions and
 %%% limitations under the License.
 %%%
-%%% File    : simple_rename_eqc_tests.erl
-%%% Purpose : Simple test to illustrate a client-based rename
+%%% File    : simple_update_counter_eqc_tests.erl
+%%% Purpose : Simple test to illustrate a client-based counter
 %%%           implementation.
 %%%-------------------------------------------------------------------
 
@@ -108,7 +108,7 @@ update_counter2(Tab, Key, Incr, Timeout, Expires) ->
             NewIntVal = update_counter_value(0, Incr),
             NewVal = integer_to_binary(NewIntVal),
             case brick_simple:add(Tab, Key, NewVal, 0, [], Timeout) of
-                ok ->
+                {ok, _} ->
                     {ok, NewIntVal};
                 key_exists ->
                     %% retry

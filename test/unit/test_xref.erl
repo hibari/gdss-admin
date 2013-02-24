@@ -87,8 +87,8 @@ start() ->
     {ok,XRef} = xref:start(xref),
     xref:set_default(XRef, [{verbose,false}, {warnings,false}]),
     xref:add_release(XRef, code:lib_dir(), {name,otp}),
-    [ {ok,_} = xref:add_directory(XRef, Root ++ Dir) || Dir <- Dirs ],
-    [ {ok,_} = xref:add_module(XRef, "../ebin/" ++ atom_to_list(Mod) ++ ".beam") || Mod <- Mods ],
+    [ {ok, _} = xref:add_directory(XRef, Root ++ Dir) || Dir <- Dirs ],
+    [ {ok, _} = xref:add_module(XRef, "../ebin/" ++ atom_to_list(Mod) ++ ".beam") || Mod <- Mods ],
     {ok, XRef, Mods}.
 
 

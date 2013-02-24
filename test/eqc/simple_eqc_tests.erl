@@ -19,25 +19,15 @@
 
 -module(simple_eqc_tests).
 
--ifdef(PROPER).
--include_lib("proper/include/proper.hrl").
--define(GMTQC, proper).
--undef(EQC).
--endif. %% -ifdef(PROPER).
+-ifdef(QC).
 
--ifdef(EQC).
--include_lib("eqc/include/eqc.hrl").
--include_lib("eqc/include/eqc_statem.hrl").
--define(GMTQC, eqc).
--undef(PROPER).
--endif. %% -ifdef(EQC).
+-include_lib("qc/include/qc.hrl").
 
--ifdef(GMTQC).
+-export([run/0]).
+-compile(export_all).
 
 -include("brick_hash.hrl").
 -include("brick_public.hrl").
-
--compile(export_all).
 
 %% eqc_statem callbacks
 -export([initial_state/0, command/1, precondition/2, postcondition/3,
@@ -49,10 +39,14 @@
 
 -record(state, {
           step = 1,
-          dict,                         %% key = term(),
-          %% val = [term()] of possible vals
-          bricks                        %% list(brick_names())
+          dict,       %% key = term(),
+                      %% val = [term()] of possible vals
+          bricks      %% list(brick_names())
          }).
+
+%% run from eunit
+eunit_test_() ->
+    qc:eunit_module(?MODULE, 3000).
 
 run() ->
     run(500).
@@ -86,8 +80,9 @@ prop_simple1_noproc_ok() ->
                  end, []).
 
 common1_prop(F_check, Env) ->
-    io:format("\n\nHibari: get_many() has been commented out from command()\n\n"),
+    setup(),
     timer:sleep(2000),
+    io:format("\n\nHibari: get_many() has been commented out from command()\n\n"),
     ?FORALL(Cmds, commands(?MODULE),
             collect({length(Cmds) div 10, div10},
                     begin
@@ -100,6 +95,23 @@ common1_prop(F_check, Env) ->
                                   end,
                                   F_check(Res, S))
                     end)).
+
+setup() ->
+    %% true to enable sasl output
+    X = brick_eunit_utils:setup_and_bootstrap(false),
+    X.
+
+teardown(X) ->
+    brick_eunit_utils:teardown(X),
+    ok.
+
+setup_noop() ->
+    %% disable sasl output
+    error_logger:delete_report_handler(error_logger_tty_h),
+    ok.
+
+teardown_noop(_X) ->
+    ok.
 
 %% initial_state() :: symbolic_state().
 %% Called in symbolic context.
@@ -121,7 +133,7 @@ initial_state() ->
                       {true, x}
               end
       end, x),
-    L = [{make_key(X), []} || X <- lists:seq(1, ?MAX_KEYS)],
+    L = [{to_binary(make_key_iolist(X)), []} || X <- lists:seq(1, ?MAX_KEYS)],
     {ok, Ps} = brick_admin:get_table_info(brick_admin, ?TABLE, 10*1000),
     GH = proplists:get_value(ghash, Ps),
     AllChains =
@@ -132,7 +144,7 @@ initial_state() ->
            bricks = lists:usort(AllBricks)}.
 
 delete_all_max_keys() ->
-    L = [{make_key(X), []} || X <- lists:seq(1, ?MAX_KEYS)],
+    L = [{to_binary(make_key_iolist(X)), []} || X <- lists:seq(1, ?MAX_KEYS)],
     [_ = is_ok_notex(catch brick_simple:delete(?TABLE, K)) || {K, _} <- L],
     %% io:format("ALL DELETED\n"),
     ok.
@@ -149,6 +161,8 @@ command(S) ->
                                                Exp, random_mod_flags()]}},
             {20,  {call, ?MODULE, simple_replace, [random_key(), random_val(),
                                                    Exp, random_mod_flags()]}},
+            {20,  {call, ?MODULE, simple_rename, [random_key(), random_key(),
+                                                  Exp, random_mod_flags()]}},
             %% We need more gets than the others because they're needed to help
             %% detect consistency errors if/when migration and or brick failures
             %% are happening while we're running.
@@ -174,6 +188,7 @@ random_do(S) ->
             {20, {simple_set, [random_key(), random_val(), Exp, random_mod_flags()]}},
             {20, {simple_add, [random_key(), random_val(), Exp, random_mod_flags()]}},
             {20, {simple_replace, [random_key(), random_val(), Exp, random_mod_flags()]}},
+            {20, {simple_rename, [random_key(), random_key(), Exp, random_mod_flags()]}},
             %% Hibari temp hack: get can timeout at end of migrations, so we'll
             %%                avoid the problem for now.
             %%        {25, {simple_get, [random_key(), random_get_flags()]}},
@@ -181,8 +196,9 @@ random_do(S) ->
            ])).
 
 random_do_flags() ->
+    frequency([{10, []}, {5, [witness]}]).
     %% I think that sync_override is broken.
-    [].
+    %% [].
 %%     ?LET({F1, F2}, {frequency([{10, []}, {5, [{sync_override, bool()}]}]),
 %%                   frequency([{10, []}, {5, [ignore_role_bad_idea_delme]}])},
 %%        F1 ++ F2).
@@ -205,6 +221,8 @@ precondition(_S, {call, _, simple_set, [_Key, _Val, _Exp, _Flags]}) ->
 precondition(_S, {call, _, simple_add, [_Key, _Val, _Exp, _Flags]}) ->
     true;
 precondition(_S, {call, _, simple_replace, [_Key, _Val, _Exp, _Flags]}) ->
+    true;
+precondition(_S, {call, _, simple_rename, [_OldKey, _NewKey, _Exp, _Flags]}) ->
     true;
 precondition(_S, {call, _, simple_get, [_Key, _Flags]}) ->
     true;
@@ -262,29 +280,41 @@ postcondition2(_S, {call, _, simple_set, [_Key, _Val, _Exp, _Flags]} = _C, R) ->
             is_ok(R)
     end;
 postcondition2(S, {call, _, simple_add, [Key, _Val, _Exp, _Flags]} = _C, R) ->
-    Vs = orddict:fetch(Key, S#state.dict),
+    BinKey = to_binary(Key),
+    Vs = orddict:fetch(BinKey, S#state.dict),
     case R of
         %%      %% For brick txn semantics
         %%      {txn_fail, [{_, {key_exists, _TS}}]} ->
         %%          Vs /= [];
         {key_exists, _TS} ->
             has_one_definite_or_maybe_val(Vs);
-        ok ->
+        {ok, _TS} ->
             has_zero_definite_vals(Vs)
     end;
 postcondition2(S, {call, _, simple_replace, [Key, _Val, _Exp, _Flags]} = _C, R) ->
-    Vs = orddict:fetch(Key, S#state.dict),
+    BinKey = to_binary(Key),
+    Vs = orddict:fetch(BinKey, S#state.dict),
     case R of
         %%      %% For brick txn semantics
         %%      {txn_fail, [{_, key_not_exist}]} ->
         %%          Vs == [];
         key_not_exist ->
             has_zero_definite_vals(Vs);
-        ok ->
+        {ok, _TS} ->
             has_one_definite_or_maybe_val(Vs)
     end;
+postcondition2(S, {call, _, simple_rename, [OldKey, NewKey, _Exp, _Flags]} = _C, R) ->
+    BinOldKey = to_binary(OldKey),
+    OldVs = orddict:fetch(BinOldKey, S#state.dict),
+    case R of
+        key_not_exist ->
+            BinOldKey =:= to_binary(NewKey) orelse has_zero_definite_vals(OldVs);
+        {ok, _TS} ->
+            has_one_definite_or_maybe_val(OldVs)
+    end;
 postcondition2(S, {call, _, simple_get, [Key, Flags]} = _C, R) ->
-    Vs = orddict:fetch(Key, S#state.dict),
+    BinKey = to_binary(Key),
+    Vs = orddict:fetch(BinKey, S#state.dict),
     case R of
         key_not_exist ->
             has_zero_definite_vals(Vs);
@@ -299,7 +329,8 @@ postcondition2(S, {call, _, simple_get, [Key, Flags]} = _C, R) ->
             true                               % Hibari temp hack?
     end;
 postcondition2(S, {call, _, simple_delete, [Key]} = _C, R) ->
-    Vs = orddict:fetch(Key, S#state.dict),
+    BinKey = to_binary(Key),
+    Vs = orddict:fetch(BinKey, S#state.dict),
     case R of
         %%      %% For brick txn semantics
         %%      {txn_fail, [{_, key_not_exist}]} ->
@@ -310,8 +341,8 @@ postcondition2(S, {call, _, simple_delete, [Key]} = _C, R) ->
             has_one_definite_or_maybe_val(Vs)
     end;
 postcondition2(S, {call, _, simple_get_many, [Key, MaxNum]} = _C, R) ->
-    AllKeys0 = [K || {K, V} <- orddict:to_list(S#state.dict),
-                     K > Key, V /= []],
+    AllKeys0 = [to_binary(K) || {K, V} <- orddict:to_list(S#state.dict),
+                                K > Key, V /= []],
     {AllKeys, Rest} = lists:split(if MaxNum > length(AllKeys0) ->
                                           length(AllKeys0);
                                      true ->
@@ -319,14 +350,13 @@ postcondition2(S, {call, _, simple_get_many, [Key, MaxNum]} = _C, R) ->
                                   end, AllKeys0),
     case R of
         {ok, {Rs, Bool}} ->
-            RsKs = [K || {K, _TS} <- Rs],
+            RsKs = [to_binary(K) || {K, _TS} <- Rs],
             %% Since we don't know what's beyond the end of our limited range,
             %% we can't test the correctness of Bool 100% completely.
-            RsKs == AllKeys andalso
-                              ((MaxNum == 0 andalso Bool == true) orelse
-                                                                    (Bool == true andalso Rest /= []) orelse
-                                                                                                        (Bool == false andalso AllKeys == []) orelse
-                               true);
+            RsKs == AllKeys
+                andalso ((MaxNum == 0 andalso Bool == true)
+                         orelse (Bool == true andalso Rest /= [])
+                         orelse (Bool == false andalso AllKeys == []));
         _ ->
             false
     end;
@@ -370,11 +400,12 @@ next_state(S, R, C) ->
     NewS#state{step = S#state.step + 1}.
 
 next_state2(S, Result, {call, _, simple_set, [Key, Val, _Exp, _Flags]}) ->
-    Old = orddict:fetch(Key, S#state.dict),
-    New = case Result of ok          -> [Val];
+    BinKey = to_binary(Key),
+    Old = orddict:fetch(BinKey, S#state.dict),
+    New = case Result of {ok, _TS} -> [Val];
               {'EXIT', _} -> [{maybe_set, Val}|Old]
           end,
-    S#state{dict = orddict:store(Key, New, S#state.dict)};
+    S#state{dict = orddict:store(BinKey, New, S#state.dict)};
 
 next_state2(S, {key_exists, _TS}, {call, _, simple_add, [_Key, _Val, _Exp, _Flags]}) ->
     %% TODO: If QuickCheck had control over the timestamps that we send,
@@ -392,22 +423,43 @@ next_state2(S, key_not_exist, {call, _, simple_replace, [_Key, _Val, _Exp, _Flag
 next_state2(S, Result, {call, _, simple_replace, [Key, Val, _Exp, _Flags]}) ->
     next_state2(S, Result, {call, ?MODULE, simple_set, [Key, Val, _Exp, _Flags]});
 
+next_state2(S, key_not_exist, {call, _, simple_rename, [_OldKey, _NewKey, _Exp, _Flags]}) ->
+    %% TODO: If QuickCheck had control over the timestamps that we send,
+    %%       then we would be able to use _TS to shrink the history list
+    %%       in the #state.dict.
+    S;
+next_state2(S, Result, {call, _, simple_rename, [OldKey, NewKey, _Exp, _Flags]}) ->
+    case Result of
+        {ok, _TS} ->
+            BinOldKey = to_binary(OldKey),
+            BinNewKey = to_binary(NewKey),
+            Vals = orddict:fetch(BinOldKey, S#state.dict),
+            S2 = next_state2(S, Result,
+                             {call, ?MODULE, simple_set, [BinNewKey, hd(Vals), _Exp, _Flags]}),
+            next_state2(S2, ok, {call, ?MODULE, simple_delete, [BinOldKey]});
+        {'EXIT', _} ->
+            S
+    end;
+
 next_state2(S, Result, {call, _, simple_get, [Key, _Flags]}) ->
-    Old = orddict:fetch(Key, S#state.dict),
-    New = case Result of key_not_exist                 -> [];
+    BinKey = to_binary(Key),
+    Old = orddict:fetch(BinKey, S#state.dict),
+    New = case Result of
+              key_not_exist                 -> [];
               {ok, _TS, Val}                -> [Val];
               {ok, _TS, Val, _ExpTime, _Fs} -> [Val];
               {'EXIT', _}                   -> Old
           end,
-    S#state{dict = orddict:store(Key, New, S#state.dict)};
+    S#state{dict = orddict:store(BinKey, New, S#state.dict)};
 
 next_state2(S, Result, {call, _, simple_delete, [Key]}) ->
-    Old = orddict:fetch(Key, S#state.dict),
+    BinKey = to_binary(Key),
+    Old = orddict:fetch(BinKey, S#state.dict),
     New = case Result of key_not_exist -> [];
               ok            -> [];
               {'EXIT', _}   -> [maybe_delete|Old]
           end,
-    S#state{dict = orddict:store(Key, New, S#state.dict)};
+    S#state{dict = orddict:store(BinKey, New, S#state.dict)};
 
 next_state2(S, FailedResult, {call, _, simple_do, [CrudeOps, _]} = C)
   when is_tuple(FailedResult) ->
@@ -444,12 +496,21 @@ next_state2(S, _Result, {call, _, crash_brick, _}) ->
 next_state2(S, _Result, _Call) ->
     S.
 
+-spec random_key() -> iolist() | string() | binary().
 random_key() ->
     ?LET(I, choose(1, ?MAX_KEYS),
          make_key(I)).
 
+-spec make_key(non_neg_integer()) -> iolist() | string() | binary().
 make_key(I) ->
-    list_to_binary(io_lib:format("~s~4.4.0w", [key_prefix(), I])).
+    oneof([make_key_iolist(I),                 %% iolist()
+           lists:flatten(make_key_iolist(I)),  %% string()
+           list_to_binary(make_key_iolist(I))  %% binary()
+          ]).
+
+-spec make_key_iolist(non_neg_integer()) -> iolist().
+make_key_iolist(I) ->
+    io_lib:format("~s~4.4.0w", [key_prefix(), I]).
 
 key_prefix() ->
     "/foo/bar/".
@@ -459,11 +520,17 @@ make_exp(S) ->
     NowX = (MSec * 1000000 * 1000000) + (Sec * 1000000) + USec,
     (NowX * 1000) + S#state.step.
 
+%% @TODO(tatsuya6502) Generate iolist and string. Check the val in postcondition.
 random_val() ->
     oneof([<<>>,
            ?LET({I, Char}, {nat(), choose($a, $z)},
                 list_to_binary(io_lib:format("v ~s",
                                              [lists:duplicate(I + 1, Char)])))]).
+
+to_binary(Bin) when is_binary(Bin) ->
+    Bin;
+to_binary(List) when is_list(List) ->
+    list_to_binary(List).
 
 simple_set(Key, Val, Exp, Flags) ->
     catch brick_simple:set(?TABLE, Key, Val, Exp, Flags, 9000).
@@ -473,6 +540,9 @@ simple_add(Key, Val, Exp, Flags) ->
 
 simple_replace(Key, Val, Exp, Flags) ->
     catch brick_simple:replace(?TABLE, Key, Val, Exp, Flags, 9000).
+
+simple_rename(OldKey, NewKey, Exp, Flags) ->
+    catch brick_simple:rename(?TABLE, OldKey, NewKey, Exp, Flags, 9000).
 
 simple_get(Key, Flags) ->
     %% Use much smaller timeout here: if we timeout, no huge deal.
@@ -490,6 +560,8 @@ simple_do(CrudeOps, DoFlags) ->
                        brick_server:make_add(K, V, Exp, Flags);
                   ({simple_replace, [K, V, Exp, Flags]}) ->
                        brick_server:make_replace(K, V, Exp, Flags);
+                  ({simple_rename, [OldK, NewK, Exp, Flags]}) ->
+                       brick_server:make_rename(OldK, NewK, Exp, Flags);
                   ({simple_get, [K, Flags]}) ->
                        brick_server:make_get(K, Flags);
                   ({simple_delete, [K]}) ->
@@ -503,6 +575,7 @@ simple_get_many(Key, MaxNum) ->
                                  {binary_prefix, list_to_binary(key_prefix())}]).
 
 is_ok(ok)                      -> true;
+is_ok({ok, _TS})               -> true;
 is_ok({'EXIT', {shutdown, _}}) -> true;
 is_ok({'EXIT', {noproc, _}})   -> true;         % Would be false in ideal world
 is_ok({'EXIT', {timeout, _}})  -> false;        % Is false in an ideal world
@@ -530,7 +603,7 @@ calc_state_usage(S) ->
 calc_actual_usage(QRoot) ->
     {ok, {All, false}} = brick_simple:get_many(?TABLE, QRoot, ?MAX_KEYS+70,
                                                [{binary_prefix, QRoot}]),
-    Vals = [V || {_K, _TS, V, _Exp, _Fs} <- All],
+    Vals = [V || {_K, _TS, V} <- All],
     Items = length(Vals),
     Bytes = lists:foldl(fun(X, Sum) -> size(X) + Sum end, 0, Vals),
     {Items, Bytes}.
@@ -561,6 +634,7 @@ all_do_list_are(DoList, Type) ->
 classify_do({simple_set, _})     -> write;
 classify_do({simple_add, _})     -> write;
 classify_do({simple_replace, _}) -> write;
+classify_do({simple_rename, _})  -> write;
 classify_do({simple_delete, _})  -> write;
 classify_do({simple_get, _})     -> read.
 
@@ -571,7 +645,7 @@ all_same_brick(List) ->
     X = [begin
              RdWr = classify_do(Do),
              Key = hd(element(2, Do)),
-             brick_simple:find_the_brick(?TABLE, Key, RdWr)
+             brick_simple_client:find_the_brick(?TABLE, Key, RdWr)
          end || Do <- List],
     length(X) == 1.
 
@@ -680,14 +754,14 @@ stopfile_exists() ->
         _       -> false
     end.
 
-wrap_with_stopfile(Num) when is_integer(Num) ->
-    wrap_with_stopfile(
-      fun() -> ?GMTQC:quickcheck(noshrink(numtests(Num, prop_simple1_noproc_ok()))) end);
-wrap_with_stopfile(Fun) when is_function(Fun) ->
-    file:write_file(stopfile(), <<>>),
-    Res = Fun(),
-    file:delete(stopfile()),
-    Res.
+%% wrap_with_stopfile(Num) when is_integer(Num) ->
+%%     wrap_with_stopfile(
+%%       fun() -> ?GMTQC:quickcheck(noshrink(numtests(Num, prop_simple1_noproc_ok()))) end);
+%% wrap_with_stopfile(Fun) when is_function(Fun) ->
+%%     file:write_file(stopfile(), <<>>),
+%%     Res = Fun(),
+%%     file:delete(stopfile()),
+%%     Res.
 
 %% Assumes using tab1 and brick naming convention tab1_ch1_b1 and tab1_ch1_b2.
 change_chain_len_while_qc_running() ->
@@ -753,4 +827,4 @@ change_num_chains(Tab) ->
     brick_admin:start_migration(Tab, LH,
                                 [{max_keys_per_iter, random:uniform(5)}]).
 
--endif. %% -ifdef(GMTQC).
+-endif. %% -ifdef(QC).

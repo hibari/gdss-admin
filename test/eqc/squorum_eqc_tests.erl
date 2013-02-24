@@ -333,14 +333,14 @@ next_state2(S, _Result, {call, _, set_num_bricks, [Bs, ShuffledBs]}) ->
             reordered = ShuffledBs};
 next_state2(S, Result, {call, _, squorum_set, [_Bricks, Key, Val, _Exp, _Flags]}) ->
     Old = orddict:fetch(Key, S#state.dict),
-    New = case Result of ok          -> [Val];
+    New = case Result of {ok, _} -> [Val];
               {'EXIT', _} -> [{maybe_set, Val}|Old]
           end,
     S#state{dict = orddict:store(Key, New, S#state.dict)};
 
 next_state2(S, Result, {call, _, squorum_get, [_Bricks, Key, _Flags]}) ->
     Old = orddict:fetch(Key, S#state.dict),
-    New = case Result of key_not_exist                 -> [];
+    New = case Result of key_not_exist      -> [];
               {ok, _TS, Val}                -> [Val];
               {ok, _TS, Val, _ExpTime, _Fs} -> [Val];
               {'EXIT', _}                   -> Old
@@ -427,7 +427,7 @@ crash_brick(BrickList, Nth) ->
     brick_server:stop({BrickName, Node}),
     start_brick(Brick). % Will delete all data & restart
 
-is_ok(ok)                      -> true;
+is_ok({ok, _})                 -> true;
 is_ok({'EXIT', {shutdown, _}}) -> true;
 is_ok({'EXIT', {noproc, _}})   -> true;         % Would be false in ideal world
 is_ok({'EXIT', {timeout, _}})  -> false;        % Is false in an ideal world

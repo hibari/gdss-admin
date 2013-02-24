@@ -53,21 +53,19 @@ test_simple_txnset1() ->
 
     KeyA = <<"/100/1/A">>,
     ValA = <<"AAA">>,
-    ValALen = byte_size(ValA),
 
     KeyB = <<"/100/1/B">>,
     ValB = <<"BBB">>,
-    _ValBLen = byte_size(ValB),
 
     %% reset
     _ = brick_simple:delete(tab1, KeyA),
     _ = brick_simple:delete(tab1, KeyB),
 
     %% add KeyA
-    ok = brick_simple:add(tab1, KeyA, ValA),
+    {ok, _} = brick_simple:add(tab1, KeyA, ValA),
 
     %% get_many
-    {ok, {[{KeyA, TS1, ValA, 0, [{val_len,ValALen}]}], false}} =
+    {ok, {[{KeyA, TS1, ValA}], false}} =
         brick_simple:get_many(tab1, KeyPrefix, 100),
 
     %% txn set KeyA and set KeyB
@@ -79,8 +77,8 @@ test_simple_txnset1() ->
         brick_simple:do(tab1, [txn, SetA, SetB]),
 
     %% get_many
-    {ok, {[{KeyA, TS1, ValA, 0, [{val_len,ValALen}]}
-          ], false}} = brick_simple:get_many(tab1, KeyPrefix, 100),
+    {ok, {[{KeyA, TS1, ValA}], false}} =
+        brick_simple:get_many(tab1, KeyPrefix, 100),
 
     ok.
 
@@ -91,21 +89,19 @@ test_simple_txnset2a() ->
 
     KeyA = <<"/100/1/A">>,
     ValA = <<"AAA">>,
-    ValALen = byte_size(ValA),
 
     KeyB = <<"/100/1/B">>,
     ValB = <<"BBB">>,
-    _ValBLen = byte_size(ValB),
 
     %% reset
     _ = brick_simple:delete(tab1, KeyA),
     _ = brick_simple:delete(tab1, KeyB),
 
     %% add KeyA
-    ok = brick_simple:add(tab1, KeyA, ValA),
+    {ok, _} = brick_simple:add(tab1, KeyA, ValA),
 
     %% get_many
-    {ok, {[{KeyA, TS1, ValA, 0, [{val_len,ValALen}]}], false}} =
+    {ok, {[{KeyA, TS1, ValA}], false}} =
         brick_simple:get_many(tab1, KeyPrefix, 100),
 
     %% txn set KeyA and set KeyB
@@ -117,8 +113,8 @@ test_simple_txnset2a() ->
         brick_simple:do(tab1, [txn, SetA, SetB]),
 
     %% get_many
-    {ok, {[{KeyA, TS1, ValA, 0, [{val_len,ValALen}]}
-          ], false}} = brick_simple:get_many(tab1, KeyPrefix, 100),
+    {ok, {[{KeyA, TS1, ValA}], false}} =
+        brick_simple:get_many(tab1, KeyPrefix, 100),
 
     ok.
 
@@ -129,21 +125,18 @@ test_simple_txnset2b() ->
 
     KeyA = <<"/100/1/A">>,
     ValA = <<"AAA">>,
-    ValALen = byte_size(ValA),
 
     KeyB = <<"/100/1/B">>,
-    ValB = <<"BBB">>,
-    _ValBLen = byte_size(ValB),
 
     %% reset
     _ = brick_simple:delete(tab1, KeyA),
     _ = brick_simple:delete(tab1, KeyB),
 
     %% add KeyA
-    ok = brick_simple:add(tab1, KeyA, ValA),
+    {ok, _} = brick_simple:add(tab1, KeyA, ValA),
 
     %% get_many
-    {ok, {[{KeyA, TS1, ValA, 0, [{val_len,ValALen}]}], false}} =
+    {ok, {[{KeyA, TS1, ValA}], false}} =
         brick_simple:get_many(tab1, KeyPrefix, 100),
 
     %% txn set KeyA and set KeyB
@@ -151,12 +144,11 @@ test_simple_txnset2b() ->
     SetA = brick_server:make_set(KeyA, TS2, ValA, 0, []),
     TS3 = 2,
     SetB = brick_server:make_set(KeyB, TS3, ValA, 0, []),
-    [ok, ok] = brick_simple:do(tab1, [txn, SetA, SetB]),
+    [{ok,TS2}, {ok,TS3}] = brick_simple:do(tab1, [txn, SetA, SetB]),
 
     %% get_many
-    {ok, {[{KeyA, TS1, ValA, 0, [{val_len,ValALen}]}
-           , {KeyB, TS3, ValA, 0, [{val_len,ValALen}]}
-          ], false}} = brick_simple:get_many(tab1, KeyPrefix, 100),
+    {ok, {[{KeyA, TS1, ValA}, {KeyB, TS3, ValA}], false}} =
+        brick_simple:get_many(tab1, KeyPrefix, 100),
 
     ok.
 
@@ -167,21 +159,19 @@ test_simple_txnset3a() ->
 
     KeyA = <<"/100/1/A">>,
     ValA = <<"AAA">>,
-    ValALen = byte_size(ValA),
 
     KeyB = <<"/100/1/B">>,
     ValB = <<"BBB">>,
-    ValBLen = byte_size(ValB),
 
     %% reset
     _ = brick_simple:delete(tab1, KeyA),
     _ = brick_simple:delete(tab1, KeyB),
 
     %% add KeyA
-    ok = brick_simple:add(tab1, KeyA, ValA),
+    {ok, _} = brick_simple:add(tab1, KeyA, ValA),
 
     %% get_many
-    {ok, {[{KeyA, TS1, ValA, 0, [{val_len,ValALen}]}], false}} =
+    {ok, {[{KeyA, TS1, ValA}], false}} =
         brick_simple:get_many(tab1, KeyPrefix, 100),
 
     %% txn set KeyA and set KeyB
@@ -189,12 +179,11 @@ test_simple_txnset3a() ->
     SetA = brick_server:make_set(KeyA, TS2, ValB, 0, []),
     TS3 = 2,
     SetB = brick_server:make_set(KeyB, TS3, ValA, 0, []),
-    [ok, ok] = brick_simple:do(tab1, [txn, SetA, SetB]),
+    [{ok,TS2}, {ok,TS3}] = brick_simple:do(tab1, [txn, SetA, SetB]),
 
     %% get_many
-    {ok, {[{KeyA, TS2, ValB, 0, [{val_len,ValBLen}]}
-           , {KeyB, TS3, ValA, 0, [{val_len,ValALen}]}
-          ], false}} = brick_simple:get_many(tab1, KeyPrefix, 100),
+    {ok, {[{KeyA, TS2, ValB}, {KeyB, TS3, ValA}], false}} =
+        brick_simple:get_many(tab1, KeyPrefix, 100),
 
     ok.
 
@@ -205,21 +194,18 @@ test_simple_txnset3b() ->
 
     KeyA = <<"/100/1/A">>,
     ValA = <<"AAA">>,
-    ValALen = byte_size(ValA),
 
     KeyB = <<"/100/1/B">>,
-    ValB = <<"BBB">>,
-    _ValBLen = byte_size(ValB),
 
     %% reset
     _ = brick_simple:delete(tab1, KeyA),
     _ = brick_simple:delete(tab1, KeyB),
 
     %% add KeyA
-    ok = brick_simple:add(tab1, KeyA, ValA),
+    {ok, _} = brick_simple:add(tab1, KeyA, ValA),
 
     %% get_many
-    {ok, {[{KeyA, TS1, ValA, 0, [{val_len,ValALen}]}], false}} =
+    {ok, {[{KeyA, TS1, ValA}], false}} =
         brick_simple:get_many(tab1, KeyPrefix, 100),
 
     %% txn set KeyA and set KeyB
@@ -227,12 +213,11 @@ test_simple_txnset3b() ->
     SetA = brick_server:make_set(KeyA, TS2, ValA, 0, []),
     TS3 = 2,
     SetB = brick_server:make_set(KeyB, TS3, ValA, 0, []),
-    [ok, ok] = brick_simple:do(tab1, [txn, SetA, SetB]),
+    [{ok,TS2}, {ok,TS3}] = brick_simple:do(tab1, [txn, SetA, SetB]),
 
     %% get_many
-    {ok, {[{KeyA, TS2, ValA, 0, [{val_len,ValALen}]}
-           , {KeyB, TS3, ValA, 0, [{val_len,ValALen}]}
-          ], false}} = brick_simple:get_many(tab1, KeyPrefix, 100),
+    {ok, {[{KeyA, TS2, ValA}, {KeyB, TS3, ValA}], false}} =
+        brick_simple:get_many(tab1, KeyPrefix, 100),
 
     ok.
 
@@ -244,21 +229,19 @@ test_simple_txnset1r() ->
 
     KeyA = <<"/100/1/A">>,
     ValA = <<"AAA">>,
-    ValALen = byte_size(ValA),
 
     KeyB = <<"/100/1/B">>,
     ValB = <<"BBB">>,
-    _ValBLen = byte_size(ValB),
 
     %% reset
     _ = brick_simple:delete(tab1, KeyA),
     _ = brick_simple:delete(tab1, KeyB),
 
     %% add KeyA
-    ok = brick_simple:add(tab1, KeyA, ValA),
+    {ok, _} = brick_simple:add(tab1, KeyA, ValA),
 
     %% get_many
-    {ok, {[{KeyA, TS1, ValA, 0, [{val_len,ValALen}]}], false}} =
+    {ok, {[{KeyA, TS1, ValA}], false}} =
         brick_simple:get_many(tab1, KeyPrefix, 100),
 
     %% txn set KeyA and set KeyB
@@ -270,8 +253,8 @@ test_simple_txnset1r() ->
         brick_simple:do(tab1, [txn, SetB, SetA]),
 
     %% get_many
-    {ok, {[{KeyA, TS1, ValA, 0, [{val_len,ValALen}]}
-          ], false}} = brick_simple:get_many(tab1, KeyPrefix, 100),
+    {ok, {[{KeyA, TS1, ValA}], false}} =
+        brick_simple:get_many(tab1, KeyPrefix, 100),
 
     ok.
 
@@ -282,21 +265,19 @@ test_simple_txnset2ar() ->
 
     KeyA = <<"/100/1/A">>,
     ValA = <<"AAA">>,
-    ValALen = byte_size(ValA),
 
     KeyB = <<"/100/1/B">>,
     ValB = <<"BBB">>,
-    _ValBLen = byte_size(ValB),
 
     %% reset
     _ = brick_simple:delete(tab1, KeyA),
     _ = brick_simple:delete(tab1, KeyB),
 
     %% add KeyA
-    ok = brick_simple:add(tab1, KeyA, ValA),
+    {ok, _} = brick_simple:add(tab1, KeyA, ValA),
 
     %% get_many
-    {ok, {[{KeyA, TS1, ValA, 0, [{val_len,ValALen}]}], false}} =
+    {ok, {[{KeyA, TS1, ValA}], false}} =
         brick_simple:get_many(tab1, KeyPrefix, 100),
 
     %% txn set KeyA and set KeyB
@@ -308,8 +289,8 @@ test_simple_txnset2ar() ->
         brick_simple:do(tab1, [txn, SetB, SetA]),
 
     %% get_many
-    {ok, {[{KeyA, TS1, ValA, 0, [{val_len,ValALen}]}
-          ], false}} = brick_simple:get_many(tab1, KeyPrefix, 100),
+    {ok, {[{KeyA, TS1, ValA}], false}} =
+        brick_simple:get_many(tab1, KeyPrefix, 100),
 
     ok.
 
@@ -320,21 +301,18 @@ test_simple_txnset2br() ->
 
     KeyA = <<"/100/1/A">>,
     ValA = <<"AAA">>,
-    ValALen = byte_size(ValA),
 
     KeyB = <<"/100/1/B">>,
-    ValB = <<"BBB">>,
-    _ValBLen = byte_size(ValB),
 
     %% reset
     _ = brick_simple:delete(tab1, KeyA),
     _ = brick_simple:delete(tab1, KeyB),
 
     %% add KeyA
-    ok = brick_simple:add(tab1, KeyA, ValA),
+    {ok, _} = brick_simple:add(tab1, KeyA, ValA),
 
     %% get_many
-    {ok, {[{KeyA, TS1, ValA, 0, [{val_len,ValALen}]}], false}} =
+    {ok, {[{KeyA, TS1, ValA}], false}} =
         brick_simple:get_many(tab1, KeyPrefix, 100),
 
     %% txn set KeyA and set KeyB
@@ -342,12 +320,11 @@ test_simple_txnset2br() ->
     SetA = brick_server:make_set(KeyA, TS2, ValA, 0, []),
     TS3 = 2,
     SetB = brick_server:make_set(KeyB, TS3, ValA, 0, []),
-    [ok, ok] = brick_simple:do(tab1, [txn, SetB, SetA]),
+    [{ok,TS3}, {ok,TS2}] = brick_simple:do(tab1, [txn, SetB, SetA]),
 
     %% get_many
-    {ok, {[{KeyA, TS1, ValA, 0, [{val_len,ValALen}]}
-           , {KeyB, TS3, ValA, 0, [{val_len,ValALen}]}
-          ], false}} = brick_simple:get_many(tab1, KeyPrefix, 100),
+    {ok, {[{KeyA, TS1, ValA}, {KeyB, TS3, ValA}], false}} =
+        brick_simple:get_many(tab1, KeyPrefix, 100),
 
     ok.
 
@@ -358,21 +335,19 @@ test_simple_txnset3ar() ->
 
     KeyA = <<"/100/1/A">>,
     ValA = <<"AAA">>,
-    ValALen = byte_size(ValA),
 
     KeyB = <<"/100/1/B">>,
     ValB = <<"BBB">>,
-    ValBLen = byte_size(ValB),
 
     %% reset
     _ = brick_simple:delete(tab1, KeyA),
     _ = brick_simple:delete(tab1, KeyB),
 
     %% add KeyA
-    ok = brick_simple:add(tab1, KeyA, ValA),
+    {ok, _} = brick_simple:add(tab1, KeyA, ValA),
 
     %% get_many
-    {ok, {[{KeyA, TS1, ValA, 0, [{val_len,ValALen}]}], false}} =
+    {ok, {[{KeyA, TS1, ValA}], false}} =
         brick_simple:get_many(tab1, KeyPrefix, 100),
 
     %% txn set KeyA and set KeyB
@@ -380,12 +355,11 @@ test_simple_txnset3ar() ->
     SetA = brick_server:make_set(KeyA, TS2, ValB, 0, []),
     TS3 = 2,
     SetB = brick_server:make_set(KeyB, TS3, ValA, 0, []),
-    [ok, ok] = brick_simple:do(tab1, [txn, SetB, SetA]),
+    [{ok,TS3}, {ok,TS2}] = brick_simple:do(tab1, [txn, SetB, SetA]),
 
     %% get_many
-    {ok, {[{KeyA, TS2, ValB, 0, [{val_len,ValBLen}]}
-           , {KeyB, TS3, ValA, 0, [{val_len,ValALen}]}
-          ], false}} = brick_simple:get_many(tab1, KeyPrefix, 100),
+    {ok, {[{KeyA, TS2, ValB}, {KeyB, TS3, ValA}], false}} =
+        brick_simple:get_many(tab1, KeyPrefix, 100),
 
     ok.
 
@@ -396,21 +370,18 @@ test_simple_txnset3br() ->
 
     KeyA = <<"/100/1/A">>,
     ValA = <<"AAA">>,
-    ValALen = byte_size(ValA),
 
     KeyB = <<"/100/1/B">>,
-    ValB = <<"BBB">>,
-    _ValBLen = byte_size(ValB),
 
     %% reset
     _ = brick_simple:delete(tab1, KeyA),
     _ = brick_simple:delete(tab1, KeyB),
 
     %% add KeyA
-    ok = brick_simple:add(tab1, KeyA, ValA),
+    {ok, _} = brick_simple:add(tab1, KeyA, ValA),
 
     %% get_many
-    {ok, {[{KeyA, TS1, ValA, 0, [{val_len,ValALen}]}], false}} =
+    {ok, {[{KeyA, TS1, ValA}], false}} =
         brick_simple:get_many(tab1, KeyPrefix, 100),
 
     %% txn set KeyA and set KeyB
@@ -418,11 +389,10 @@ test_simple_txnset3br() ->
     SetA = brick_server:make_set(KeyA, TS2, ValA, 0, []),
     TS3 = 2,
     SetB = brick_server:make_set(KeyB, TS3, ValA, 0, []),
-    [ok, ok] = brick_simple:do(tab1, [txn, SetB, SetA]),
+    [{ok,TS3}, {ok,TS2}] = brick_simple:do(tab1, [txn, SetB, SetA]),
 
     %% get_many
-    {ok, {[{KeyA, TS2, ValA, 0, [{val_len,ValALen}]}
-           , {KeyB, TS3, ValA, 0, [{val_len,ValALen}]}
-          ], false}} = brick_simple:get_many(tab1, KeyPrefix, 100),
+    {ok, {[{KeyA, TS2, ValA}, {KeyB, TS3, ValA}], false}} =
+        brick_simple:get_many(tab1, KeyPrefix, 100),
 
     ok.
