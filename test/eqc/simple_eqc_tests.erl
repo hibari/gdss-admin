@@ -29,8 +29,6 @@
 -include("brick_hash.hrl").
 -include("brick_public.hrl").
 
--compile(export_all).
-
 %% eqc_statem callbacks
 -export([initial_state/0, command/1, precondition/2, postcondition/3,
          next_state/3]).
