@@ -236,7 +236,7 @@ init([Chain, Bricks]) ->
 %% called if a timeout occurs.
 %%--------------------------------------------------------------------
 unknown(_Event, S) ->
-    ?E_ERROR("~s: unknown 2: ~p\n", [?MODULE, _Event]),
+    ?E_ERROR("~s: unknown 2: ~p", [?MODULE, _Event]),
     {next_state, unknown, S}.
 
 unknown_timeout(evt_timeout_during_unknown, S) ->
@@ -248,24 +248,22 @@ healthy(_Event, S) ->
 %% Remember: degraded means at least 1 brick is up and ok, but not all bricks.
 
 degraded({evt_degraded, __N, __ChangingBrick} = _Event, S) ->
-    ?DBG_CHAINx({degraded, _Event}),
+    ?DBG_CHAIN("degraded ~w", [_Event]),
     ChainNow = S#state.chain_now,
     NotInNow = S#state.bricks -- ChainNow,
     if length(ChainNow) == S#state.chainlen ->
             %% The chain is complete, so use the configured brick order.
             {ok, GH} = brick_admin:get_gh_by_chainname(S#state.chain),
             if GH#g_hash_r.migrating_p ->
-                    ?E_INFO(
-                       "Chain ~w: degraded -> healthy, migration in effect, "
-                       "keeping chain order as ~w\n",[S#state.chain, ChainNow]),
+                    ?E_INFO("Chain ~w: degraded -> healthy, migration in effect, "
+                            "keeping chain order as ~w",[S#state.chain, ChainNow]),
                     brick_sb:report_chain_status(S#state.chain, healthy,
                                                  [{chain_now, ChainNow}]),
                     timer:sleep(1000),
                     ok = set_all_chain_roles(ChainNow, S);
                true ->
-                    ?E_INFO(
-                       "Chain ~w: degraded -> healthy, no migration, resetting "
-                       "chain order as ~w\n", [S#state.chain, S#state.bricks]),
+                    ?E_INFO("Chain ~w: degraded -> healthy, no migration, resetting "
+                            "chain order as ~w", [S#state.chain, S#state.bricks]),
                     brick_sb:report_chain_status(S#state.chain, healthy,
                                                  [{chain_now, S#state.bricks}]),
                     timer:sleep(1000),
@@ -281,10 +279,10 @@ degraded({evt_degraded, __N, __ChangingBrick} = _Event, S) ->
             %% game with the last_bricks_status: all bricks that are not part
             %% of the chain will be set to unknown state, and the next status
             %% check will take care of identifying the next candidate brick.
-            ?DBG_CHAINx(S#state.bricks),
-            ?DBG_CHAINx(ChainNow),
-            ?DBG_CHAINx(NotInNow),
-            ?DBG_CHAINx(S#state.last_bricks_status),
+            ?DBG_CHAIN("degraded - bricks ~w", [S#state.bricks]),
+            ?DBG_CHAIN("degraded - chain now  ~w", [ChainNow]),
+            ?DBG_CHAIN("degraded - not it now ~w", [NotInNow]),
+            ?DBG_CHAIN("degraded - last bricks status ~w", [S#state.last_bricks_status]),
             Repairing = S#state.repairing_brick,
             LBS = lists:map(fun({Brick, _} = X) when Brick == Repairing ->
                                     X;          % Don't play with this status!
@@ -294,15 +292,15 @@ degraded({evt_degraded, __N, __ChangingBrick} = _Event, S) ->
                                         _    -> X
                                     end
                             end, S#state.last_bricks_status),
-            ?DBG_CHAINx(LBS),
+            ?DBG_CHAIN("degraded - last brick status [updated] ~w", [LBS]),
             {next_state, degraded, S#state{last_bricks_status = LBS}}
     end;
 degraded(_Event, S) ->
-    ?E_ERROR("~s: degraded 2: ~p\n", [?MODULE, _Event]),
+    ?E_ERROR("~s: degraded 2: ~p", [?MODULE, _Event]),
     {next_state, degraded, S}.
 
 stopped(_Event, S) ->
-    ?E_ERROR("~s: stopped 2: ~p\n", [?MODULE, _Event]),
+    ?E_ERROR("~s: stopped 2: ~p", [?MODULE, _Event]),
     {next_state, stopped, S}.
 
 %%--------------------------------------------------------------------
@@ -321,27 +319,27 @@ stopped(_Event, S) ->
 %% name as the current state name StateName is called to handle the event.
 %%--------------------------------------------------------------------
 unknown(_Event, _From, State) ->
-    ?E_ERROR("~s: unknown 3: ~p\n", [?MODULE, _Event]),
+    ?E_ERROR("~s: unknown 3: ~p", [?MODULE, _Event]),
     Reply = ok,
     {reply, Reply, unknown, State}.
 
 unknown_timeout(_Event, _From, State) ->
-    ?E_ERROR("~s: unknown_timeout 3: ~p\n", [?MODULE, _Event]),
+    ?E_ERROR("~s: unknown_timeout 3: ~p", [?MODULE, _Event]),
     Reply = ok,
     {reply, Reply, unknown_timeout, State}.
 
 healthy(_Event, _From, State) ->
-    ?E_ERROR("~s: healthy 3: ~p\n", [?MODULE, _Event]),
+    ?E_ERROR("~s: healthy 3: ~p", [?MODULE, _Event]),
     Reply = ok,
     {reply, Reply, healthy, State}.
 
 degraded(_Event, _From, State) ->
-    ?E_ERROR("~s: degraded 3: ~p\n", [?MODULE, _Event]),
+    ?E_ERROR("~s: degraded 3: ~p", [?MODULE, _Event]),
     Reply = ok,
     {reply, Reply, degraded, State}.
 
 stopped(_Event, _From, State) ->
-    ?E_ERROR("~s: stopped 3: ~p\n", [?MODULE, _Event]),
+    ?E_ERROR("~s: stopped 3: ~p", [?MODULE, _Event]),
     Reply = ok,
     {reply, Reply, stopped, State}.
 
@@ -357,7 +355,7 @@ stopped(_Event, _From, State) ->
 %% the event.
 %%--------------------------------------------------------------------
 handle_event(Event, StateName, State) ->
-    ?E_ERROR("~s: handle_event: ~P in ~p\n",
+    ?E_ERROR("~s: handle_event: ~P in ~p",
              [?MODULE, Event, 20, StateName]),
     {next_state, StateName, State}.
 
@@ -380,7 +378,7 @@ handle_sync_event({state}, _From, StateName, State) ->
     Ps = state_to_proplist(State),
     {reply, [{state_name, StateName}|Ps], StateName, State};
 handle_sync_event(Event, _From, StateName, State) ->
-    ?E_ERROR("~s: handle_sync_event: ~P in ~p\n",
+    ?E_ERROR("~s: handle_sync_event: ~P in ~p",
              [?MODULE, Event, 20, StateName]),
     Reply = ok,
     {reply, Reply, StateName, State}.
@@ -406,12 +404,12 @@ handle_info(finish_init_tasks, unknown = StateName, State) ->
     {next_state, StateName, State#state{last_bricks_status = LastBricksStatus}};
 handle_info({'DOWN', _MRef, _Type, Pid, Info}, _StateName, State)
   when Pid == State#state.sb_pid ->
-    ?E_INFO("~s: ~p: scoreboard process ~p stopped, ~p\n",
+    ?E_INFO("~s: ~p: scoreboard process ~p stopped, ~p",
             [?MODULE, State#state.chain, Pid, Info]),
     timer:sleep(1000), % Allow some time for scoreboard to recover
     {stop, scoreboard_down, State};
 handle_info(_Info, StateName, State) ->
-    ?E_ERROR("~s: handle_info: ~P\n", [?MODULE, _Info, 20]),
+    ?E_ERROR("~s: handle_info: ~P", [?MODULE, _Info, 20]),
     {next_state, StateName, State}.
 
 %%--------------------------------------------------------------------
@@ -452,7 +450,7 @@ calculate_any_best_first_brick(S) ->
                         {ok, HList} ->
                             {false, HList};
                         _  ->
-                            ?DBG_CHAIN("CCC p1 ~w ", [B]),
+                            ?DBG_CHAIN("calculate_any_best_first_birck - CCC p1 ~w", [B]),
                             timer:sleep(200),
                             {true, B}
                     end
@@ -463,7 +461,7 @@ calculate_any_best_first_brick(S) ->
                       {HList, B}
               end, lists:sort(S#state.bricks)),
     SortHist = calculate_best_first_brick2(Hist1),
-    ?DBG_CHAINx(SortHist),
+    ?DBG_CHAIN("calculate_any_best_first_birkt - short hist ~w", [SortHist]),
     [Br || {_LastDownTime, Br} <- SortHist].
 
 -spec calculate_best_first_brick(#state{}) -> brick().
@@ -553,8 +551,8 @@ do_check_status2(StateName, S) when is_record(S, state) ->
     check_difflist_for_disk_error(DiffList, S),
     {NewStateName, NewS} =
         if DiffList /= [] ->
-                %%?E_INFO("QQQ ZZZ: StateName = ~p, diff = ~p\n", [StateName, DiffList]),
-                %%?E_INFO("QQQ ZZZ: repairing_brick = ~p\n", [S#state.repairing_brick]),
+                %%?E_INFO("QQQ ZZZ: StateName = ~p, diff = ~p", [StateName, DiffList]),
+                %%?E_INFO("QQQ ZZZ: repairing_brick = ~p", [S#state.repairing_brick]),
                 process_brickstatus_diffs(StateName, DiffList,
                                           LastBricksStatus, NewBricksStatus, S);
            true ->
@@ -606,8 +604,8 @@ external_to_internal_status(_B, Status) ->
         does_not_exist ->
             unknown;
         _X ->
-            ?DBG_CHAINx({external_to_internal_status, _B, Status}),
-            ?E_INFO("external_to_internal_status: ~p status ~p, mapping to unknown\n", [_B, Status]),
+            ?DBG_CHAIN("external_to_internal_status ~w ~w", [_B, Status]),
+            ?E_INFO("external_to_internal_status: ~p status ~p, mapping to unknown", [_B, Status]),
             unknown
     end.
 
@@ -671,7 +669,7 @@ process_brickstatus_diffs(StateName, _DiffList, _LastBricksStatus,
                     if GH#g_hash_r.migrating_p == false ->
                             ?E_INFO(
                                "Chain ~w: New chain is healthy, migration "
-                               "is NOT in effect, using chain order ~w\n",
+                               "is NOT in effect, using chain order ~w",
                                [S#state.chain, S#state.bricks]),
                             ok = set_all_chain_roles_reorder(
                                    S#state.chain, S#state.bricks,
@@ -688,7 +686,7 @@ process_brickstatus_diffs(StateName, _DiffList, _LastBricksStatus,
                                        end,
                             ?E_INFO(
                                "Chain ~w: New chain is healthy, migration "
-                               "IS in effect, using order ~w\n",
+                               "IS in effect, using order ~w",
                                [S#state.chain, NewChain]),
                             ok = set_all_chain_roles(NewChain, S),
                             {healthy, S#state{last_bricks_status =
@@ -708,7 +706,7 @@ process_brickstatus_diffs(StateName, _DiffList, _LastBricksStatus,
                               StateName, NewBricksStatus, OK_Bricks, S)
                     end;
                AllPreInit_p andalso S#state.chainlen == 1 ->
-                    ?E_INFO("Chain ~w: adding ~w as standalone\n",
+                    ?E_INFO("Chain ~w: adding ~w as standalone",
                             [S#state.chain, BestBrick]),
                     ok = go_start_1chain_sync(BestBrick),
                     %% Remain in unknown/stopped state.  We will
@@ -719,7 +717,7 @@ process_brickstatus_diffs(StateName, _DiffList, _LastBricksStatus,
                     %% This is almost exactly the same as previous
                     %% case (pre_init and chain len == 1), but our
                     %% new state name will be different.
-                    ?E_INFO("Chain ~w: adding best brick ~w as temporary head of the chain\n",
+                    ?E_INFO("Chain ~w: adding best brick ~w as temporary head of the chain",
                             [S#state.chain, BestBrick]),
                     ok = go_start_1chain_sync(BestBrick),
                     NBS = substitute_prop(NewBricksStatus, BestBrick, ok),
@@ -751,7 +749,7 @@ process_brickstatus_diffs(healthy = _StateName, DiffList, LastBricksStatus,
                                        ({Brick, {_, NewStatus}}) ->
                                             {Brick, NewStatus} end,
                                     DiffList),
-    ?DBG_CHAINx({was_healthy, S#state.chain, DownBricks}),
+    ?DBG_CHAIN("was_healthy ~w ~w", [S#state.chain, DownBricks]),
     NBS = lists:foldl(
             fun({Brick, NewStatus}, NBS_acc) ->
                     substitute_prop(NBS_acc, Brick, NewStatus)
@@ -763,7 +761,7 @@ process_brickstatus_diffs(healthy = _StateName, DiffList, LastBricksStatus,
             ok;
         {_, false} ->
             ?E_INFO("Chain ~p was healthy, bricks now down = ~p, repairing "
-                    "brick = ~p\n", [S#state.chain, DownBricks,RepairingBrick]),
+                    "brick = ~p", [S#state.chain, DownBricks,RepairingBrick]),
             {R_Br, R_Nd} = RepairingBrick,
             %% Force repair to start over again (in later poll cycle).
             ok = brick_server:chain_set_my_repair_state(R_Br, R_Nd, pre_init);
@@ -807,7 +805,7 @@ process_brickstatus_diffs(degraded = StateName, DiffList, LastBricksStatus,
                 Status = (catch brick_server:chain_get_my_repair_state(
                                   BrName, NdName)),
                 St = external_to_internal_status(Brick, {ok, Status}),
-                ?E_INFO("Status adjustment: Brick ~w: ~w -> ~w -> ~w\n",
+                ?E_INFO("Status adjustment: Brick ~w: ~w -> ~w -> ~w",
                         [Brick, OldStatus, NewStatus0, St]),
                 if St == OldStatus ->
                         %% TODO: So, we've had a ficticious (I hope!)  report
@@ -843,7 +841,7 @@ process_brickstatus_diffs(degraded = StateName, DiffList, LastBricksStatus,
     RepairingBrick = S#state.repairing_brick,
     if Brick == LastBrickInChainNow, RepairingBrick /= undefined ->
             ?E_INFO("Chain ~p was degraded, brick down = ~p, repairing "
-                    "brick = ~p\n", [S#state.chain, Brick, RepairingBrick]),
+                    "brick = ~p", [S#state.chain, Brick, RepairingBrick]),
             {R_Br, R_Nd} = RepairingBrick,
             %% Force repair to start over again (in later poll cycle).
             %% Use catch this time: RepairingBrick may also be dead.
@@ -857,7 +855,7 @@ process_brickstatus_diffs(degraded = StateName, DiffList, LastBricksStatus,
             {StateName, S#state{last_bricks_status = NBS}};
        Brick == S#state.repairing_brick, NewStatus == ok ->
             ?DBG_CHAINx({qwer, 5}),
-            ?E_INFO("Chain ~w: added ~w to end of chain, repair finished\n",
+            ?E_INFO("Chain ~w: added ~w to end of chain, repair finished",
                     [S#state.chain, Brick]),
             %% Avoid a race condition where we tell the Admin Server
             %% that the chain has Brick at the tail, but Brick's role
@@ -875,7 +873,7 @@ process_brickstatus_diffs(degraded = StateName, DiffList, LastBricksStatus,
                                          [{repairing_brick_failed,
                                            {Brick, NewStatus}},
                                           {chain_now, S#state.chain_now}]),
-            ?E_INFO("Chain ~w: repairing_brick ~w failed, status = ~w\n",
+            ?E_INFO("Chain ~w: repairing_brick ~w failed, status = ~w",
                     [S#state.chain, S#state.repairing_brick, NewStatus]),
             gen_fsm:send_event(self(), {evt_degraded, 0, Brick}),
             ?DBG_CHAINx({qwer, m1}),
@@ -913,9 +911,9 @@ process_brickstatus_diffs(degraded = StateName, DiffList, LastBricksStatus,
             end;
        S#state.repairing_brick == undefined, NewStatus == pre_init ->
             %% We now have the next brick to re-join the chain.
-            ?E_INFO("Chain ~w: current = ~w, adding ~w to end of chain, starting repair\n",
+            ?E_INFO("Chain ~w: current = ~w, adding ~w to end of chain, starting repair",
                     [S#state.chain, S#state.chain_now, Brick]),
-            ?DBG_CHAINx({qqq_adding_to_end_of_chain,Brick,NBS}),
+            ?DBG_CHAIN("qqq_adding_to_end_of_chain ~w ~w", [Brick,NBS]),
             ok = add_repair_brick_to_end(Brick, S),
             ?DBG_CHAINx({qwer, 2}),
             brick_sb:report_chain_status(S#state.chain, degraded,
@@ -942,14 +940,14 @@ process_brickstatus_diffs(degraded = StateName, DiffList, LastBricksStatus,
             %%
             %% Fix: specifically force the wayward brick back to pre_init
             %% state.
-            ?E_INFO("Chain monitor: ~p: force ~p from ok -> pre_init\n",
+            ?E_INFO("Chain monitor: ~p: force ~p from ok -> pre_init",
                     [S#state.chain, Brick]),
             ok = brick_server:chain_set_my_repair_state(
                    BrName, NdName, force_ok_to_pre_init),
             PingerName = brick_bp:make_pinger_registered_name(BrName),
             brick_sb:report_brick_status(BrName, NdName, pre_init,
                                          [chain_monitor_adjustment]),
-            ?E_INFO("Chain monitor: ~p: restart ~p\n",
+            ?E_INFO("Chain monitor: ~p: restart ~p",
                     [S#state.chain, PingerName]),
             exit(whereis(PingerName), kill),
             PreInitNBS = substitute_prop(LastBricksStatus, Brick, unknown2),
@@ -981,7 +979,7 @@ process_brickstatus_diffs(degraded = StateName, DiffList, LastBricksStatus,
 process_brickstatus_diffs(_StateName, _DiffList, _LastBricksStatus,
                           _NewBricksStatus, S)
   when is_record(S, state) ->
-    ?E_WARNING("TODO: process_brickstatus_diffs(StateName = ~p\n_DiffList = ~p\n_LastBricksStatus = ~p\n_NewBricksStatus = ~p\n",
+    ?E_WARNING("TODO: process_brickstatus_diffs(StateName = ~p\n_DiffList = ~p\n_LastBricksStatus = ~p\n_NewBricksStatus = ~p",
                [_StateName, _DiffList, _LastBricksStatus, _NewBricksStatus]),
     qqqqqqqqqqqqqqq_unfinished2.
 
@@ -990,7 +988,7 @@ process_brickstatus_some_ok(StateName, NewBricksStatus, OK_Bricks, S) ->
     case (catch figure_out_current_chain_op_status(OK_Bricks)) of
         {ok, ChainList, RepairingBrick} ->
             ?E_INFO("Chain ~w: current operating state (ok "
-                    "bricks) is ~w with repairing brick ~w\n",
+                    "bricks) is ~w with repairing brick ~w",
                     [S#state.chain, ChainList, RepairingBrick]),
             if length(NewBricksStatus) == length(ChainList),
                RepairingBrick == undefined ->
@@ -1028,10 +1026,10 @@ process_brickstatus_some_ok_fallback(_StateName, NewBricksStatus,
                                      OK_Bricks, S) ->
     B1 = whittle_chain_to_1(OK_Bricks, S),
     ?E_INFO("Chain ~w: adding ok status brick ~w as temporary "
-            "head of the chain\n", [S#state.chain, B1]),
-    ?E_INFO("Chain ~w: last_bricks_status = ~p\n",
+            "head of the chain", [S#state.chain, B1]),
+    ?E_INFO("Chain ~w: last_bricks_status = ~p",
             [S#state.chain, S#state.last_bricks_status]),
-    ?E_INFO("Chain ~w: NewBricksStatus = ~p\n",
+    ?E_INFO("Chain ~w: NewBricksStatus = ~p",
             [S#state.chain, NewBricksStatus]),
     NBS = substitute_prop(NewBricksStatus, B1, ok),
     gen_fsm:send_event(self(), {evt_degraded, 1, B1}),
@@ -1065,7 +1063,7 @@ figure_out_current_chain_op_status(OK_Bricks) ->
                      #opconf_r{me = B, role = Role, upstream = UpStream,
                                downstream = DnStream, off_tail_p = OffTail}
              end, OK_Bricks),
-    ?DBG_CHAIN("CCC: OpCs = ~p\n", [OpCs]),
+    ?DBG_CHAIN("figure_out_current_chain_op_status - CCC: OpCs = ~w", [OpCs]),
     {BrickList, RepairingBrick} = stitch_op_state(OpCs),
     {ok, BrickList, RepairingBrick}.
 
@@ -1145,8 +1143,8 @@ stitch_op_state_3(OpCs) ->
                       ok
               end
       end, OpCs),
-    ?DBG_CHAIN("topsort down   = ~p\n", [digraph_utils:topsort(DownG)]),
-    ?DBG_CHAIN("rev topsort up = ~p\n", [catch lists:reverse(digraph_utils:topsort(UpG))]),
+    ?DBG_CHAIN("topsort down   = ~w", [digraph_utils:topsort(DownG)]),
+    ?DBG_CHAIN("rev topsort up = ~w", [catch lists:reverse(digraph_utils:topsort(UpG))]),
     Tdown = digraph_utils:topsort(DownG),
     Tup = digraph_utils:topsort(UpG),
     Tup_rev = if Tup == false   -> false;
@@ -1202,7 +1200,7 @@ is_brick_ok(B) -> (is_brick_x(ok))(B).
 
 -spec go_start_1chain_sync(brick()) -> ok.
 go_start_1chain_sync({Brick, Node}) ->
-    ?DBG_CHAINx({go_start_1chain_sync, {Brick, Node}}),
+    ?DBG_CHAIN("go_start_1chain_sync ~w ~w", [Brick, Node]),
     ok = do_role_ok(chain_role_standalone, [Brick, Node]),
     standalone = brick_server:chain_get_role(Brick, Node),
     ok = brick_server:chain_set_my_repair_state(Brick, Node, ok),
@@ -1217,7 +1215,7 @@ go_start_1chain_sync({Brick, Node}) ->
                                                 % Force report to sb as *sync*?
     %% Sanity check.
     ok = brick_server:chain_get_my_repair_state(Brick, Node),
-    ?DBG_CHAINx({go_start_1chain_sync, done, {Brick, Node}}),
+    ?DBG_CHAIN("go_start_1chain_sync [done] ~w ~w", [Brick, Node]),
     ok.
 
 %% TODO: If AnyOK_p is actually true, then why did we bother waiting so
@@ -1252,7 +1250,7 @@ do_unknown_timeout_decision(S) when is_record(S, state) ->
             [BestStatus] = [BS || {BB, BS} <- S#state.last_bricks_status,
                                   BB == BestBrick],
             ?E_INFO("unknown_timeout_decision: ~p: "
-                    "best brick is ~p but its status is ~p\n",
+                    "best brick is ~p but its status is ~p",
                     [S#state.chain, BestBrick, BestStatus]),
             brick_sb:report_chain_status(S#state.chain, stopped,
                                          [?EMPTY_CHAIN_NOW,
@@ -1306,10 +1304,9 @@ set_all_chain_roles(BrickList, S) ->
 
 -spec set_all_chain_roles(bricklist(), bricklist() | skip, #state{}) -> ok.
 set_all_chain_roles(BrickList, OldBrickList, S) ->
-    ?E_INFO("set_all_chain_roles: ~p: top\n", [S#state.chain]),
-    ?DBG_CHAINx({set_all_chain_roles, S#state.chain, read_only, 1}),
+    ?E_INFO("set_all_chain_roles: ~p: top", [S#state.chain]),
     ok = set_all_read_only(BrickList, true),
-    ?E_INFO("set_all_chain_roles: ~p: brick read-only 1\n", [S#state.chain]),
+    ?E_INFO("set_all_chain_roles: ~p: brick read-only 1", [S#state.chain]),
     if is_list(OldBrickList), length(OldBrickList) > 0 ->
             %% In this case, we're not certain if all log replay has
             %% propagated down the entire chain, because we're not
@@ -1320,22 +1317,19 @@ set_all_chain_roles(BrickList, OldBrickList, S) ->
             %% is!).  Instead, we'll poll each of the bricks in the
             %% old chain to see that the downstream serial ack # is
             %% current.
-            ?DBG_CHAINx({set_all_chain_roles, S#state.chain, read_only, 2}),
             ok = set_all_read_only(OldBrickList, true),
-            ?E_INFO("set_all_chain_roles: ~p: brick read-only 2\n", [S#state.chain]),
+            ?E_INFO("set_all_chain_roles: ~p: brick read-only 2", [S#state.chain]),
             lists:foreach(
               fun({Br, Nd}) ->
-                      %%?E_WARNING("ZZZ: ~p: call poll_for_full_sync(~p, ~p) for 2sec\n", [S#state.chain, Br, Nd]),
-                      %%?E_WARNING("ZZZ: ~p: OldBrickList ~p\n", [S#state.chain, OldBrickList]),
+                      %%?E_WARNING("ZZZ: ~p: call poll_for_full_sync(~p, ~p) for 2sec", [S#state.chain, Br, Nd]),
+                      %%?E_WARNING("ZZZ: ~p: OldBrickList ~p", [S#state.chain, OldBrickList]),
                       case poll_for_full_sync(Br, Nd, 15*1000) of
                           ok ->
-                              ?E_INFO(
-                                 "Downstream serial ack for {~w, ~w} is good\n",
-                                 [Br, Nd]);
+                              ?E_INFO("Downstream serial ack for {~w, ~w} is good",
+                                      [Br, Nd]);
                           Res ->
-                              ?E_ERROR(
-                                 "Downstream serial ack for {~w, ~w} was ~w\n",
-                                 [Br, Nd, Res]),
+                              ?E_ERROR("Downstream serial ack for {~w, ~w} was ~w",
+                                       [Br, Nd, Res]),
                               exit({poll_for_full_sync, Br, Nd, Res})
                       end
               end, OldBrickList),
@@ -1343,11 +1337,11 @@ set_all_chain_roles(BrickList, OldBrickList, S) ->
        true ->
             ok
     end,
-    ?DBG_CHAINx({set_all_chain_roles, S#state.chain, roles2}),
+    ?DBG_CHAIN("set_all_chain_roles ~w roles2", [S#state.chain]),
     ok = set_all_chain_roles2(BrickList, S),
 
     %% Take care of the case where a middle brick died.
-    ?DBG_CHAINx({set_all_chain_roles, S#state.chain, bricklist, BrickList}),
+    ?DBG_CHAIN("set_all_chain_roles ~w bricklist ~w", [S#state.chain, BrickList]),
     if BrickList == [] ->
             nothing_to_do;
        true ->
@@ -1355,29 +1349,28 @@ set_all_chain_roles(BrickList, OldBrickList, S) ->
             {ChainDownSerial, ChainDownAcked} =
                 brick_server:chain_get_downstream_serials(NewHead, NewNode),
             if ChainDownSerial /= ChainDownAcked ->
-                    ?E_INFO("New head {~w,~w}: ChainDownSerial ~w /= ChainDownAcked ~w, reflushing log downstream\n", [NewHead, NewNode, ChainDownSerial, ChainDownAcked]),
-                    ?DBG_CHAINx({set_all_chain_roles, S#state.chain, flush_log, {NewHead, NewNode}}),
+                    ?E_INFO("New head {~w,~w}: ChainDownSerial ~w /= ChainDownAcked ~w, reflushing log downstream",
+                            [NewHead, NewNode, ChainDownSerial, ChainDownAcked]),
+                    ?DBG_CHAIN("set_all_chain_roles ~w flush_log ~w ~w", [S#state.chain, NewHead, NewNode]),
                     ok = brick_server:chain_flush_log_downstream(NewHead,
                                                                  NewNode),
-                    %%?E_WARNING("ZZZ: ~p: call poll_for_full_sync(~p, ~p) for 5sec\n", [S#state.chain, NewHead, NewNode]),
+                    %%?E_WARNING("ZZZ: ~p: call poll_for_full_sync(~p, ~p) for 5sec", [S#state.chain, NewHead, NewNode]),
                     _ = brick_server:sync_down_the_chain(NewHead, NewNode, []),
                     Res = poll_for_full_sync(NewHead, NewNode, 5*1000),
-                    ?E_INFO("New head {~w,~w}: flush was ~w\n",
-                            [NewHead, NewNode, Res]),
+                    ?E_INFO("New head {~w,~w}: flush was ~w", [NewHead, NewNode, Res]),
                     Res = ok;                   % sanity
                true ->
-                    ?DBG_CHAINx({set_all_chain_roles, S#state.chain, flush_log, none}),
+                    ?DBG_CHAIN("set_all_chain_roles ~w flush_log, none", [S#state.chain]),
                     ok
             end
     end,
 
-    ?DBG_CHAINx({set_all_chain_roles, S#state.chain, read_only, false}),
+    ?DBG_CHAIN("set_all_chain_roles ~w read_only, false", [S#state.chain]),
     ok = set_all_read_only(BrickList, false).
 
 -spec set_all_chain_roles2(bricklist(), #state{}) -> ok.
 set_all_chain_roles2([], S) ->
-    ?E_WARNING("set_all_chain_roles2: empty list for ~p\n",
-               [S#state.chain]),
+    ?E_WARNING("set_all_chain_roles2: empty list for ~p", [S#state.chain]),
     ok;
 set_all_chain_roles2([{Name, Node}], _S) ->
     ok = do_role_ok(chain_role_standalone, [Name, Node]),
@@ -1445,30 +1438,30 @@ set_all_chain_roles2(BrickList, _S) ->
 
 -spec set_all_chain_roles_reorder(chain_name(), bricklist(), bricklist(), #state{}) -> ok.
 set_all_chain_roles_reorder(ChainName, BrickList, OldBrickList, S) ->
-    ?DBG_CHAINx({set_all_chain_roles_reorder, S#state.chain, read_only, true}),
+    ?DBG_CHAIN("set_all_chain_roles_reorder ~w read_only, true", [S#state.chain]),
     ok = set_all_read_only(BrickList, true),
-    ?DBG_CHAINx({set_all_chain_roles_reorder, S#state.chain, set_roles1, OldBrickList}),
+    ?DBG_CHAIN("set_all_chain_roles_reorder ~w set_roles1 ~w", [S#state.chain, OldBrickList]),
     ok = set_all_chain_roles(OldBrickList, S),
     Fpoll = fun(Acc) ->
                     {ok, GH} = brick_admin:get_gh_by_chainname(ChainName),
                     Cs = brick_hash:all_chains(GH, current) ++
                         brick_hash:all_chains(GH, new),
                     BL = proplists:get_value(ChainName, Cs),
-                    ?DBG_CHAIN("CCC: chain ~w BL = ~p\n", [ChainName, BL]),
+                    ?DBG_CHAIN("set_all_chain_roles_reorder - CCC: chain ~w BL = ~p", [ChainName, BL]),
                     if BL == BrickList ->
                             {false, Acc};
                        Acc > 12*50 ->
                             exit({set_all_chain_roles_reorder, timeout,
                                   ChainName, BL, BrickList});
                        true ->
-                            ?DBG_CHAIN("CCC p2", []),
+                            ?DBG_CHAIN("set_all_chain_roles_reorder - CCC p2", []),
                             timer:sleep(100),
                             {true, Acc + 1}
                     end
             end,
-    ?DBG_CHAIN("\n\n\nCCC: We've got sync for ~w!\n\n", [ChainName]),
+    ?DBG_CHAIN("set_all_chain_roles_reorder - CCC: We've got sync for ~w!", [ChainName]),
 
-    ?DBG_CHAINx({set_all_chain_roles_reorder, S#state.chain, set_roles2, BrickList}),
+    ?DBG_CHAIN("set_all_chain_roles_reorder ~w set_roles2 ~w", [S#state.chain, BrickList]),
     %% Remember: a side-effect is turning off read-only mode.
     ok = set_all_chain_roles(BrickList, OldBrickList, S),
     %% This status report will trigger a GH spamming using the new
@@ -1488,7 +1481,7 @@ set_all_read_only(BrickList, Mode_p) when is_list(BrickList) ->
 add_repair_brick_to_end({NewTail, NewTailNode} = _NewTailBrick, S) ->
     ChainNow = S#state.chain_now,
     {NowLast1, NowLast1Node} = NowLast1Brick = lists:last(ChainNow),
-    %%?DBG_CHAINx({brick_to_end, tail, NewTail, NewTailNode, NowLast1, NowLast1Node}),
+    %%?DBG_CHAIN("brick_to_end [tail] ~w ~w ~w ~w", [NewTail, NewTailNode, NowLast1, NowLast1Node]),
     ok = brick_server:chain_role_tail(NewTail, NewTailNode,
                                       NowLast1, NowLast1Node,
                                       [{official_tail, false}]),
@@ -1509,16 +1502,17 @@ add_repair_brick_to_end({NewTail, NewTailNode} = _NewTailBrick, S) ->
 
     HeadBrick = hd(S#state.chain_now),
     if HeadBrick == NowLast1Brick ->
-            %%?DBG_CHAINx({brick_to_end, head, NowLast1, NowLast1Node, NewTail, NewTailNode}),
+            %%?DBG_CHAIN("brick_to_end [head] ~w ~w ~w ~w", [NowLast1, NowLast1Node, NewTail, NewTailNode]),
             ok = brick_server:chain_role_head(NowLast1, NowLast1Node,
                                               NewTail, NewTailNode,
                                               [{official_tail, true}]),
-            %%?DBG_CHAINx({brick_to_end, repair, NowLast1, NowLast1Node}),
+            %%?DBG_CHAIN("brick_to_end [repair] ~w ~w", [NowLast1, NowLast1Node]),
             ok = brick_server:chain_start_repair(NowLast1, NowLast1Node);
        true ->
             [{NowLast1, NowLast1Node}, {NowLast2, NowLast2Node}|Others] =
                 lists:reverse(ChainNow),
-            %%?DBG_CHAINx({brick_to_end, middle, NowLast1, NowLast1Node, NowLast2, NowLast2Node, NewTail, NewTailNode}),
+            %%?DBG_CHAIN("brick_to_end, [middle] ~w ~w ~w ~w ~w ~w",
+            %%           [NowLast1, NowLast1Node, NowLast2, NowLast2Node, NewTail, NewTailNode]),
             ok = brick_server:chain_role_middle(NowLast1, NowLast1Node,
                                                 NowLast2, NowLast2Node,
                                                 NewTail, NewTailNode,
@@ -1540,7 +1534,7 @@ add_repair_brick_to_end({NewTail, NewTailNode} = _NewTailBrick, S) ->
             %% Sanity check.
             pre_init = brick_server:chain_get_ds_repair_state(NowLast1,
                                                               NowLast1Node),
-            %%?DBG_CHAINx({brick_to_end, repair, NowLast1, NowLast1Node}),
+            %%?DBG_CHAIN("brick_to_end [repair] ~w ~w", [NowLast1, NowLast1Node]),
             ok = brick_server:chain_start_repair(NowLast1, NowLast1Node)
     end,
     ok.
@@ -1582,13 +1576,13 @@ poll_for_full_sync(Brick, Node, TimeLimit_0) ->
                                                 %% The downstream brick is not alive,
                                                 %% the downstream serials from Brick
                                                 %% are not going to change.
-                                                ?E_INFO("poll_for_full_sync: ~w ~w: downstream brick ~w ~w is not alive\n", [Brick, Node, DnBr, DnNd]),
+                                                ?E_INFO("poll_for_full_sync: ~w ~w: downstream brick ~w ~w is not alive", [Brick, Node, DnBr, DnNd]),
                                                 {false, Acc}
                                         end
                                 end
                         end;
                     Err ->
-                        ?E_ERROR("poll_for_full_sync: ~w ~w: ~p\n",
+                        ?E_ERROR("poll_for_full_sync: ~w ~w: ~p",
                                  [Brick, Node, Err]),
                         {false, Err}
                 end
