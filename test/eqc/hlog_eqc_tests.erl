@@ -19,20 +19,9 @@
 
 -module(hlog_eqc_tests).
 
--ifdef(PROPER).
--include_lib("proper/include/proper.hrl").
--define(GMTQC, proper).
--undef(EQC).
--endif. %% -ifdef(PROPER).
+-ifdef(QC).
 
--ifdef(EQC).
--include_lib("eqc/include/eqc.hrl").
--include_lib("eqc/include/eqc_statem.hrl").
--define(GMTQC, eqc).
--undef(PROPER).
--endif. %% -ifdef(EQC).
-
--ifdef(GMTQC).
+-include_lib("qc/include/qc.hrl").
 
 -include("gmt_hlog.hrl").
 -include_lib("kernel/include/file.hrl").
@@ -495,4 +484,4 @@ do_scribbles(ArgsList, PathT) ->
 %% Pread "./zzz-hlog-qc/000000000005.HLOG" at Pos 32 for 23 bytes
 %% Use Scribble <<"©©©©©©©©©©©©©©©©©©©©©©©">> at "./zzz-hlog-qc/000000000005.HLOG" Pos 32
 
--endif. %% -ifdef(GMTQC).
+-endif. %% -ifdef(QC).

@@ -907,7 +907,7 @@ stopfile_exists() ->
 
 %% wrap_with_stopfile(Num) when is_integer(Num) ->
 %%     wrap_with_stopfile(
-%%       fun() -> ?GMTQC:quickcheck(noshrink(numtests(Num, prop_simple1_noproc_ok()))) end);
+%%       fun() -> ?QC:quickcheck(noshrink(numtests(Num, prop_simple1_noproc_ok()))) end);
 %% wrap_with_stopfile(Fun) when is_function(Fun) ->
 %%     file:write_file(stopfile(), <<>>),
 %%     Res = Fun(),

@@ -19,18 +19,9 @@
 
 -module(brick_test0).
 
--ifdef(PROPER).
--include_lib("proper/include/proper.hrl").
--define(GMTQC, proper).
--undef(EQC).
--endif. %% -ifdef(PROPER).
-
--ifdef(EQC).
--include_lib("eqc/include/eqc.hrl").
--include_lib("eqc/include/eqc_statem.hrl").
--define(GMTQC, eqc).
--undef(PROPER).
--endif. %% -ifdef(EQC).
+-ifdef(QC).
+-include_lib("qc/include/qc.hrl").
+-endif. %% -ifdef(QC).
 
 -include("brick.hrl").
 -include("brick_admin.hrl").
@@ -4080,16 +4071,16 @@ reliable_gdss_stop() ->
 reliable_gdss_stop_and_start() ->
     brick_eunit_utils:setup().
 
--ifdef(GMTQC).
+-ifdef(QC).
 qc_check(NumTests, NumMore, Props) ->
-    true = ?GMTQC:quickcheck(
+    true = ?QC:quickcheck(
               noshrink(
                 numtests(
                   NumTests, more_commands(NumMore, Props)))).
 -else.
 qc_check(_NumTests, _NumMore, _Props) ->
     true.
--endif. %% -ifdef(GMTQC).
+-endif. %% -ifdef(QC).
 
 cl_eqc_hlog_local_eqc__t1() ->
     cl_eqc_hlog_local_eqc__t1(?NUM_EQC_TESTS_DEFAULT).

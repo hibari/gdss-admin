@@ -19,19 +19,9 @@
 
 -module(hash_eqc_tests).
 
--ifdef(PROPER).
--include_lib("proper/include/proper.hrl").
--define(GMTQC, proper).
--undef(EQC).
--endif. %% -ifdef(PROPER).
+-ifdef(QC).
 
--ifdef(EQC).
--include_lib("eqc/include/eqc.hrl").
--define(GMTQC, eqc).
--undef(PROPER).
--endif. %% -ifdef(EQC).
-
--ifdef(GMTQC).
+-include_lib("qc/include/qc.hrl").
 
 -compile(export_all).
 
@@ -181,4 +171,4 @@ gb_next_always_works(NextFloatList, GbTree) ->
         end,
     lists:all(F, lists:zip(NextFloatList, SecondForPair)).
 
--endif. %% -ifdef(GMTQC).
+-endif. %% -ifdef(QC).

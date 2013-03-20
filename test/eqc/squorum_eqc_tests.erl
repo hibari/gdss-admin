@@ -19,20 +19,9 @@
 
 -module(squorum_eqc_tests).
 
--ifdef(PROPER).
--include_lib("proper/include/proper.hrl").
--define(GMTQC, proper).
--undef(EQC).
--endif. %% -ifdef(PROPER).
+-ifdef(QC).
 
--ifdef(EQC).
--include_lib("eqc/include/eqc.hrl").
--include_lib("eqc/include/eqc_statem.hrl").
--define(GMTQC, eqc).
--undef(PROPER).
--endif. %% -ifdef(EQC).
-
--ifdef(GMTQC).
+-include_lib("qc/include/qc.hrl").
 
 -define(NOTEST, true). %% TEST FAILS
 
@@ -42,7 +31,7 @@
 
 -compile(export_all).
 
--export([start_bricks/0, prop_squorum1/0]).
+-export([start_bricks/1, prop_squorum1/0]).
 -export([set_num_bricks/2,
          squorum_set/5, squorum_get/3, squorum_delete/2, squorum_get_keys/3,
          trigger_checkpoint/1, set_do_sync/2, scavenge/1,
@@ -74,8 +63,8 @@ run() ->
 run(NumTests) ->
     gmt_eqc:module({numtests,NumTests}, ?MODULE).
 
-start_bricks() ->
-    [catch start_brick(B) || B <- ?BRICKS].
+start_bricks(Bricks) ->
+    [catch start_brick(B) || B <- Bricks].
 
 start_brick({Br, _Nd} = Brick) ->
     gmt_hlog_common:full_writeback(?GMT_HLOG_COMMON_LOG_NAME),
@@ -88,13 +77,15 @@ start_brick({Br, _Nd} = Brick) ->
     ok.
 
 prop_squorum1() ->
-    io:format("\n\n\nDon't forget to run ~s:start_bricks() before using.\n\n",
-              [?MODULE]),
-    timer:sleep(1234),
+    %% io:format("\n\n\nDon't forget to run ~s:start_bricks() before using.\n\n",
+    %%           [?MODULE]),
+    %% timer:sleep(1234),
     ?LET(NumBricks, oneof([2, 3, 5, 7]),
          ?LET(Pivot, choose(1, NumBricks),
               begin
                   Bricks = lists:sublist(?BRICKS, NumBricks),
+                  start_bricks(Bricks),
+                  %% timer:sleep(1000),
                   %% "Cut the deck" around a pivot position, to
                   %% simulate shuffling the list of bricks, but we
                   %% keep the shuffled list constant for the duration
@@ -103,7 +94,8 @@ prop_squorum1() ->
                   L_left = lists:sublist(Bricks, 1, Pivot - 1),
                   L_both = L_right ++ L_left,
                   Env = [{env_reordered, L_both}, {env_bricks, Bricks}],
-                  common1_prop(fun(X, _S) -> X == ok end, Env)
+                  io:format("~n~nEnv: ~p", [Env]),
+                  common1_prop(fun(X, _S) -> X =:= ok end, Env)
               end)).
 
 common1_prop(F_check, Env) ->
@@ -163,19 +155,17 @@ command(#state{step = StepN} = S) when StepN > 1 ->
             %% We need more gets than the others because they're needed to help
             %% detect consistency errors if/when migration and or brick failures
             %% are happening while we're running.
-            {100,  {call, ?MODULE, squorum_get, [{var, env_bricks},
-                                                 random_key(), random_get_flags()]}},
-            {50,  {call, ?MODULE, squorum_delete, [{var, env_bricks},
-                                                   random_key()]}},
+            {100, {call, ?MODULE, squorum_get,        [{var, env_bricks},
+                                                       random_key(), random_get_flags()]}},
+            {50,  {call, ?MODULE, squorum_delete,     [{var, env_bricks},
+                                                       random_key()]}},
             {2,   {call, ?MODULE, trigger_checkpoint, [oneof(S#state.bricks)]}},
-            {1,   {call, ?MODULE, set_do_sync, [oneof(S#state.bricks),
-                                                oneof([true, false])]}}
-
-            , {30, {call, ?MODULE, crash_brick, [{var, env_reordered},
-                                                 choose(1, 2)]}}
-
-                                                %        ,{30,   {call, ?MODULE, crash_brick, [{var, env_reordered},
-                                                %                                            choose(1, length(EnvBricks))]}}
+            {1,   {call, ?MODULE, set_do_sync,        [oneof(S#state.bricks),
+                                                       oneof([true, false])]}},
+            {30,  {call, ?MODULE, crash_brick,        [{var, env_reordered},
+                                                       choose(1, 2)]}}
+            %% {30,  {call, ?MODULE, crash_brick,        [{var, env_reordered},
+            %%                                            choose(1, length(EnvBricks))]}}
            ])).
 
 random_get_flags() ->
@@ -184,14 +174,14 @@ random_get_flags() ->
 random_mod_flags() ->
     oneof([[], [value_in_ram]]).
 
-random_many_key() ->
-    frequency([{1, list_to_binary(key_prefix())}, {3, random_key()}]).
+%% random_many_key() ->
+%%     frequency([{1, list_to_binary(key_prefix())}, {3, random_key()}]).
 
 %% precondition(S::symbolic_state(), C::call()) :: bool()
 %% Called in symbolic (??) & runtime context.
 
 precondition(S, {call, _, set_num_bricks, [_Bs, _L]}) ->
-    S#state.step == 1;
+    S#state.step =:= 1;
 precondition(S, {call, _, squorum_set, [_Bricks, _Key, _Val, _Exp, _Flags]}) ->
     S#state.step > 1;
 precondition(S, {call, _, squorum_get, [_Bricks, _Key, _Flags]}) ->
@@ -247,11 +237,11 @@ postcondition2(S, {call, _, squorum_get, [_Bricks, Key, Flags]} = _C, R) ->
         key_not_exist ->
             has_zero_definite_vals(Vs);
         {ok, _TS, Val} ->
-            proplists:get_value(get_all_attribs, Flags) == undefined
+            proplists:get_value(get_all_attribs, Flags) =:= undefined
                 andalso val_is_a_definite_or_maybe(Val, Vs);
         %% with get_all_attribs flag
         {ok, _TS, Val, _ExpTime, _Flags} ->
-            proplists:get_value(get_all_attribs, Flags) /= undefined
+            proplists:get_value(get_all_attribs, Flags) =/= undefined
                 andalso val_is_a_definite_or_maybe(Val, Vs);
         {'EXIT', {timeout, _}} ->
             true                               % Hibari temp hack?
@@ -261,7 +251,7 @@ postcondition2(S, {call, _, squorum_delete, [_Bricks, Key]} = _C, R) ->
     case R of
         %%      %% For brick txn semantics
         %%      {txn_fail, [{_, key_not_exist}]} ->
-        %%          Vs == [];
+        %%          Vs =:= [];
         key_not_exist ->
             has_zero_definite_vals(Vs);
         ok ->
@@ -269,7 +259,7 @@ postcondition2(S, {call, _, squorum_delete, [_Bricks, Key]} = _C, R) ->
     end;
 postcondition2(S, {call, _, squorum_get_keys, [_Bricks, Key, MaxNum]} = _C, R) ->
     AllKeys0 = [K || {K, V} <- orddict:to_list(S#state.dict),
-                     K > Key, V /= []],
+                     K > Key, V =/= []],
     {AllKeys, Rest} = lists:split(if MaxNum > length(AllKeys0) ->
                                           length(AllKeys0);
                                      true ->
@@ -280,11 +270,11 @@ postcondition2(S, {call, _, squorum_get_keys, [_Bricks, Key, MaxNum]} = _C, R) -
             RsKs = [K || {K, _TS} <- Rs],
             %% Since we don't know what's beyond the end of our limited range,
             %% we can't test the correctness of Bool 100% completely.
-            RsKs == AllKeys andalso
-                              ((MaxNum == 0 andalso Bool == true) orelse
-                                                                    (Bool == true andalso Rest /= []) orelse
-                                                                                                        (Bool == false andalso AllKeys == []) orelse
-                               true);
+            RsKs =:= AllKeys
+                andalso ((MaxNum =:= 0 andalso Bool)
+                         orelse (Bool andalso Rest =/= [])
+                         orelse (not Bool andalso AllKeys =:= [])
+                         orelse true);
         _ ->
             false
     end;
@@ -299,7 +289,7 @@ postcondition2(S, {call, _, simple_do, [CrudeOps, _]} = _C, R) ->
                               postcondition2(S, {call, ?MODULE, Name, Args},
                                              Res)
                       end, CrudeRes),
-            lists:all(fun(X) -> X == true end, Bools)
+            lists:all(fun(X) -> X =:= true end, Bools)
     end;
 postcondition2(_S, {call, _, trigger_checkpoint, _}, _R) ->
     true;
@@ -333,8 +323,11 @@ next_state2(S, _Result, {call, _, set_num_bricks, [Bs, ShuffledBs]}) ->
             reordered = ShuffledBs};
 next_state2(S, Result, {call, _, squorum_set, [_Bricks, Key, Val, _Exp, _Flags]}) ->
     Old = orddict:fetch(Key, S#state.dict),
-    New = case Result of {ok, _} -> [Val];
-              {'EXIT', _} -> [{maybe_set, Val}|Old]
+    New = case Result of
+              {ok, _} ->
+                  [Val];
+              {'EXIT', _} ->
+                  [{maybe_set, Val}|Old]
           end,
     S#state{dict = orddict:store(Key, New, S#state.dict)};
 
@@ -458,9 +451,9 @@ has_zero_definite_vals(Vs) ->
 
 val_is_a_definite_or_maybe(Val, Vs) ->
     lists:any(
-      fun(B) when B == Val              -> true;
-         ({maybe_set, B}) when B == Val -> true;
-         (_)                            -> false
+      fun(B) when B =:= Val              -> true;
+         ({maybe_set, B}) when B =:= Val -> true;
+         (_)                             -> false
       end, Vs).
 
 %% Useful, public helpers.
@@ -483,4 +476,4 @@ poll_repair_state({Brick, Node}, Wanted, SleepMs, MaxIters) ->
         end,
     gmt_loop:do_while(RepairPoll, MaxIters).
 
--endif. %% -ifdef(GMTQC).
+-endif. %% -ifdef(QC).
