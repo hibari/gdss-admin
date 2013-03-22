@@ -22,7 +22,7 @@
 {application, gdss_admin,
  [
   {description, "Gemini Distributed Storage Service, Admin Server"},
-  {vsn, "0.1.6.1"},
+  {vsn, "0.3.0"},
   {registered, []},
   {applications, [kernel, stdlib, sasl, crypto, inets, gdss_brick, gdss_client]},
   {mod, {brick_admin, []}},
