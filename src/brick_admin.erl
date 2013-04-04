@@ -2428,7 +2428,6 @@ fast_sync_scav(StartNode, UpBrick, UpNode, NewBrick, NewNode, Opts) ->
 
                throttle_pid = ThrottlePid,
                exclusive_p = false,
-               log_fun = fun(Fmt, Args) -> ?ELOG_INFO(Fmt, Args) end,
                bottom_fun = fun fast_sync_bottom10/7},
     Fdoit = fun() ->
                     _ = [rpc:call(Nd, error_logger, info_msg,
