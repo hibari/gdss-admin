@@ -2404,7 +2404,6 @@ fast_sync_scav(StartNode, UpBrick, UpNode, NewBrick, NewNode, Opts) ->
     ThrottlePid = proplists:get_value(throttle_pid, Opts),
     ThrottleBytes = proplists:get_value(throttle_bytes, Opts),
     StopNewBrick_p = proplists:get_value(stop_new_brick, Opts, false),
-    Destructive_p = not proplists:get_value(dry_run, Opts, false),
 
     SA = #scav{options = [{new_brick, NewBrick}, {new_node, NewNode},
                           {up_brick, UpBrick}, {up_node, UpNode}|Opts],
@@ -2417,7 +2416,6 @@ fast_sync_scav(StartNode, UpBrick, UpNode, NewBrick, NewNode, Opts) ->
                %% For common log, there is only one seqnum that's
                %% off-limits: the current one, CurSeq.
                last_check_seq = CurSeq,
-               destructive = Destructive_p,
                skip_live_percentage_greater_than = 100, % no skipping
                sorter_size = 16*1024*1024,
 
@@ -2493,9 +2491,9 @@ fast_sync_one_seq_file_fun(TempDir, SA, ____Fread_blob, Finfolog,
                                           {file, DInPath}, {mode,read_only}]),
             {ok, FH} = gmt_hlog_common:open_log_file(SA#scav.log_dir, SeqNum,
                                                      [read, binary]),
+            Destructive = true,
             Fread_and_send =
-                read_hunk_send_replay_fun(UpBrick, UpNode, NewBrick, NewNode,
-                                          SA#scav.destructive, FH),
+                read_hunk_send_replay_fun(UpBrick, UpNode, NewBrick, NewNode, Destructive, FH),
             %% Actual read & cast to new node is done here.
             {Hunks, Bytes, Errs, _, _} =
                 brick_ets:disk_log_fold(
