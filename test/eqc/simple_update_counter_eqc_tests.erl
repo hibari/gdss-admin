@@ -84,14 +84,14 @@ update_counter2(Tab, Key, Incr, Timeout, Expires) ->
         {ok, TS, Val} ->
             IntVal =
                 try
-                    binary_to_integer(Val)
+                    erlang:binary_to_integer(Val)
                 catch
                     exit:badarg ->
                         undefined
                 end,
             if is_integer(IntVal) ->
                     NewIntVal = update_counter_value(IntVal, Incr),
-                    NewVal = integer_to_binary(NewIntVal),
+                    NewVal = erlang:integer_to_binary(NewIntVal),
                     case brick_simple:replace(Tab, Key, NewVal, 0, [{testset, TS}], Timeout) of
                         ok ->
                             {ok, NewIntVal};
@@ -106,7 +106,7 @@ update_counter2(Tab, Key, Incr, Timeout, Expires) ->
             end;
         key_not_exists ->
             NewIntVal = update_counter_value(0, Incr),
-            NewVal = integer_to_binary(NewIntVal),
+            NewVal = erlang:integer_to_binary(NewIntVal),
             case brick_simple:add(Tab, Key, NewVal, 0, [], Timeout) of
                 {ok, _} ->
                     {ok, NewIntVal};
@@ -127,9 +127,3 @@ update_counter_value(Val, Incr) ->
         _ ->
             0
     end.
-
-binary_to_integer(X) ->
-    erlang:list_to_integer(erlang:binary_to_list(X)).
-
-integer_to_binary(X) ->
-    erlang:list_to_binary(erlang:integer_to_list(X)).
