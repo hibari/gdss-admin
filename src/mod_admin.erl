@@ -367,14 +367,9 @@ make_brick_row(Brick, Node, FullP, Data0) ->
         INDO = proplists:get_value(n_do, Impl, 0),
         ITooOld = proplists:get_value(n_too_old, Status, 0),
         INExp = proplists:get_value(n_expired, Impl, 0),
-        IX = case proplists:get_value(checkpoint, Impl) of
-                 undefined ->
-                     case proplists:get_value(sweep_key, Sweep) of
-                         undefined -> undefined;
-                         SweepKey  -> {sweep_key, SweepKey}
-                     end;
-                 CP_val ->
-                     CP_val
+        IX = case proplists:get_value(sweep_key, Sweep) of
+                 undefined -> undefined;
+                 SweepKey  -> {sweep_key, SweepKey}
              end,
 
         [<<"<tr class='data'>">>,
