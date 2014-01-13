@@ -251,7 +251,7 @@ degraded({evt_degraded, __N, __ChangingBrick} = _Event, S) ->
     ?DBG_CHAIN("degraded ~w", [_Event]),
     ChainNow = S#state.chain_now,
     NotInNow = S#state.bricks -- ChainNow,
-    if length(ChainNow) == S#state.chainlen ->
+    if length(ChainNow) =:= S#state.chainlen ->
             %% The chain is complete, so use the configured brick order.
             {ok, GH} = brick_admin:get_gh_by_chainname(S#state.chain),
             if GH#g_hash_r.migrating_p ->
@@ -284,7 +284,7 @@ degraded({evt_degraded, __N, __ChangingBrick} = _Event, S) ->
             ?DBG_CHAIN("degraded - not it now ~w", [NotInNow]),
             ?DBG_CHAIN("degraded - last bricks status ~w", [S#state.last_bricks_status]),
             Repairing = S#state.repairing_brick,
-            LBS = lists:map(fun({Brick, _} = X) when Brick == Repairing ->
+            LBS = lists:map(fun({Brick, _} = X) when Brick =:= Repairing ->
                                     X;          % Don't play with this status!
                                ({Brick, _} = X) ->
                                     case lists:member(Brick, NotInNow) of
@@ -403,7 +403,7 @@ handle_info(finish_init_tasks, unknown = StateName, State) ->
     LastBricksStatus = [{B, unknown} || B <- State#state.bricks],
     {next_state, StateName, State#state{last_bricks_status = LastBricksStatus}};
 handle_info({'DOWN', _MRef, _Type, Pid, Info}, _StateName, State)
-  when Pid == State#state.sb_pid ->
+  when Pid =:= State#state.sb_pid ->
     ?E_INFO("~s: ~p: scoreboard process ~p stopped, ~p",
             [?MODULE, State#state.chain, Pid, Info]),
     timer:sleep(1000), % Allow some time for scoreboard to recover
@@ -435,7 +435,7 @@ code_change(_OldVsn, StateName, State, _Extra) ->
 %%--------------------------------------------------------------------
 
 -spec do_check_status(state_name(), #state{}) -> {next_state, state_name(), #state{}}.
-do_check_status(unknown, S) when S#state.num_checks == 10 ->
+do_check_status(unknown, S) when S#state.num_checks =:= 10 ->
     gen_fsm:send_event(self(), evt_timeout_during_unknown),
     brick_sb:report_chain_status(S#state.chain, unknown_timeout,
                                  [?EMPTY_CHAIN_NOW]),
@@ -550,7 +550,7 @@ do_check_status2(StateName, S) when is_record(S, state) ->
     DiffList = diff_status_list(LastBricksStatus, NewBricksStatus),
     check_difflist_for_disk_error(DiffList, S),
     {NewStateName, NewS} =
-        if DiffList /= [] ->
+        if DiffList =/= [] ->
                 %%?E_INFO("QQQ ZZZ: StateName = ~p, diff = ~p", [StateName, DiffList]),
                 %%?E_INFO("QQQ ZZZ: repairing_brick = ~p", [S#state.repairing_brick]),
                 process_brickstatus_diffs(StateName, DiffList,
@@ -559,8 +559,8 @@ do_check_status2(StateName, S) when is_record(S, state) ->
                 {StateName, S}
         end,
     NumChecks =
-        if NewStateName /= StateName ->
-                Extra = if NewS#state.chain_now == [] ->
+        if NewStateName =/= StateName ->
+                Extra = if NewS#state.chain_now =:= [] ->
                                 BestBrick = calculate_best_first_brick(S),
                                 [{best_brick, BestBrick}];
                            true ->
@@ -572,7 +572,7 @@ do_check_status2(StateName, S) when is_record(S, state) ->
                    {difflist, DiffList},
                    {updated_last_bricks_status, NewS#state.last_bricks_status},
                    {chain_now, NewS#state.chain_now}] ++ Extra),
-                if NewStateName == unknown ->
+                if NewStateName =:= unknown ->
                         0;
                    true ->
                         NewS#state.num_checks + 1
@@ -598,8 +598,8 @@ get_brickstatus(Bricks) ->
 -spec external_to_internal_status(brick(), {ok, state_name()} | atom()) -> now_internal_status().
 external_to_internal_status(_B, Status) ->
     case Status of
-        {ok, X} when X == unknown; X == pre_init; X == ok ; X == repairing;
-                     X == repair_overload; X == disk_error ->
+        {ok, X} when X =:= unknown; X =:= pre_init; X =:= ok ; X =:= repairing;
+                     X =:= repair_overload; X =:= disk_error ->
             X;
         does_not_exist ->
             unknown;
@@ -630,8 +630,8 @@ process_brickstatus_diffs(StateName, [] = _DiffList, _LastBricksStatus,
 %%-
 process_brickstatus_diffs(StateName, _DiffList, _LastBricksStatus,
                           NewBricksStatus, S)
-  when StateName == unknown orelse StateName == stopped orelse
-       StateName == unknown_timeout,
+  when StateName =:= unknown orelse StateName =:= stopped orelse
+       StateName =:= unknown_timeout,
        is_record(S, state) ->
     AnyUnknown_p = lists:any(fun is_brick_unknown/1, NewBricksStatus),
     AllOK_p = lists:all(fun is_brick_ok/1, NewBricksStatus),
@@ -644,8 +644,8 @@ process_brickstatus_diffs(StateName, _DiffList, _LastBricksStatus,
                      {value, {BestBrick, Val}} -> Val;
                      _                         -> unknown
                  end,
-    BestOK_p = (BestStatus == ok),
-    BestPre_Init_p = (BestStatus == pre_init),
+    BestOK_p = (BestStatus =:= ok),
+    BestPre_Init_p = (BestStatus =:= pre_init),
 
     %% NOTE: If we're going to enter degraded state from here, then we will
     %% always return NewBricksStatus so that that up-to-date status list is
@@ -655,18 +655,18 @@ process_brickstatus_diffs(StateName, _DiffList, _LastBricksStatus,
     %% we also need to use substitute_prop() because we *know* that the
     %% first brick we started is now in ok state.
 
-    if AnyUnknown_p == false
+    if AnyUnknown_p =:= false
        orelse
        (BestOK_p orelse BestPre_Init_p) ->
             %% OK, we've heard reports from all bricks.  Now what?
             %% Or, we haven't heard reports from all bricks (some are still
             %% not responding), but we know that the best brick (the one we
             %% care most about) is either pre_init or ok.
-            if AllOK_p == true ->
+            if AllOK_p =:= true ->
                     %% Just in case we crashed in the middle of something,
                     %% and current roles are incorrect, set all roles again.
                     {ok, GH} = brick_admin:get_gh_by_chainname(S#state.chain),
-                    if GH#g_hash_r.migrating_p == false ->
+                    if GH#g_hash_r.migrating_p =:= false ->
                             ?E_INFO(
                                "Chain ~w: New chain is healthy, migration "
                                "is NOT in effect, using chain order ~w",
@@ -678,8 +678,8 @@ process_brickstatus_diffs(StateName, _DiffList, _LastBricksStatus,
                                                   NewBricksStatus,
                                               chain_now = S#state.bricks,
                                               repairing_brick = undefined}};
-                       GH#g_hash_r.migrating_p == true ->
-                            NewChain = if S#state.chain_now == [] ->
+                       GH#g_hash_r.migrating_p =:= true ->
+                            NewChain = if S#state.chain_now =:= [] ->
                                                S#state.bricks;
                                           is_list(S#state.chain_now) ->
                                                S#state.chain_now
@@ -695,7 +695,7 @@ process_brickstatus_diffs(StateName, _DiffList, _LastBricksStatus,
                                               repairing_brick = undefined}}
                     end;
                AnyOK_p ->
-                    if BestOK_p, S#state.chainlen == 1 ->
+                    if BestOK_p, S#state.chainlen =:= 1 ->
                             %% QQQ TODO: This clause is redundant now, right?
                             {healthy,
                              S#state{last_bricks_status = NewBricksStatus,
@@ -705,7 +705,7 @@ process_brickstatus_diffs(StateName, _DiffList, _LastBricksStatus,
                             process_brickstatus_some_ok(
                               StateName, NewBricksStatus, OK_Bricks, S)
                     end;
-               AllPreInit_p andalso S#state.chainlen == 1 ->
+               AllPreInit_p andalso S#state.chainlen =:= 1 ->
                     ?E_INFO("Chain ~w: adding ~w as standalone",
                             [S#state.chain, BestBrick]),
                     ok = go_start_1chain_sync(BestBrick),
@@ -715,7 +715,7 @@ process_brickstatus_diffs(StateName, _DiffList, _LastBricksStatus,
                     {StateName, S#state{last_bricks_status = NewBricksStatus}};
                BestPre_Init_p ->
                     %% This is almost exactly the same as previous
-                    %% case (pre_init and chain len == 1), but our
+                    %% case (pre_init and chain len =:= 1), but our
                     %% new state name will be different.
                     ?E_INFO("Chain ~w: adding best brick ~w as temporary head of the chain",
                             [S#state.chain, BestBrick]),
@@ -768,7 +768,7 @@ process_brickstatus_diffs(healthy = _StateName, DiffList, LastBricksStatus,
         _ ->
             ok
     end,
-    if length(NewChain) == 0 ->
+    if length(NewChain) =:= 0 ->
             {stopped, S#state{last_bricks_status = NBS, chain_now = []}};
        true ->
             %% TODO: If multiple bricks have failed, then our attempt
@@ -807,7 +807,7 @@ process_brickstatus_diffs(degraded = StateName, DiffList, LastBricksStatus,
                 St = external_to_internal_status(Brick, {ok, Status}),
                 ?E_INFO("Status adjustment: Brick ~w: ~w -> ~w -> ~w",
                         [Brick, OldStatus, NewStatus0, St]),
-                if St == OldStatus ->
+                if St =:= OldStatus ->
                         %% TODO: So, we've had a ficticious (I hope!)  report
                         %% of state X -> something worse, but the brick is
                         %% really still at state X.  So, patch up both status
@@ -820,14 +820,14 @@ process_brickstatus_diffs(degraded = StateName, DiffList, LastBricksStatus,
                         St                      % Use really-current status
                 end;
             false ->
-                if OldStatus == ok, NewStatus0 /= ok ->
+                if OldStatus =:= ok, NewStatus0 =/= ok ->
                         %% label: "races suck"
                         %% If this brick used to be ok, then we don't
                         %% *really* know what its status is.  We're liable to
                         %% races with the brick pinger and scoreboard
                         %% updates, which sucks.  If we say that the new
                         %% status is unknown, then a subsequent poll of the
-                        %% scoreboard can tell us something /= unknown, and
+                        %% scoreboard can tell us something =/= unknown, and
                         %% that diff will trigger us to take action at that
                         %% time.
                         %% TODO: create a better fix for these races?
@@ -839,7 +839,7 @@ process_brickstatus_diffs(degraded = StateName, DiffList, LastBricksStatus,
     NBS = substitute_prop(LastBricksStatus, Brick, NewStatus),
     LastBrickInChainNow = lists:last(S#state.chain_now),
     RepairingBrick = S#state.repairing_brick,
-    if Brick == LastBrickInChainNow, RepairingBrick /= undefined ->
+    if Brick =:= LastBrickInChainNow, RepairingBrick =/= undefined ->
             ?E_INFO("Chain ~p was degraded, brick down = ~p, repairing "
                     "brick = ~p", [S#state.chain, Brick, RepairingBrick]),
             {R_Br, R_Nd} = RepairingBrick,
@@ -850,10 +850,10 @@ process_brickstatus_diffs(degraded = StateName, DiffList, LastBricksStatus,
             ok
     end,
     BrickIsInChainNow_p = lists:member(Brick, S#state.chain_now),
-    if Brick == S#state.repairing_brick, NewStatus == repairing ->
+    if Brick =:= S#state.repairing_brick, NewStatus =:= repairing ->
             ?DBG_CHAINx({qwer, 4}),
             {StateName, S#state{last_bricks_status = NBS}};
-       Brick == S#state.repairing_brick, NewStatus == ok ->
+       Brick =:= S#state.repairing_brick, NewStatus =:= ok ->
             ?DBG_CHAINx({qwer, 5}),
             ?E_INFO("Chain ~w: added ~w to end of chain, repair finished",
                     [S#state.chain, Brick]),
@@ -866,7 +866,7 @@ process_brickstatus_diffs(degraded = StateName, DiffList, LastBricksStatus,
             {StateName, S#state{last_bricks_status = NBS,
                                 chain_now = NewChain,
                                 repairing_brick = undefined}};
-       Brick == S#state.repairing_brick, NewStatus /= ok ->
+       Brick =:= S#state.repairing_brick, NewStatus =/= ok ->
             %% The brick that we're trying to start & repair has failed.
             %% Bummer.
             brick_sb:report_chain_status(S#state.chain, degraded,
@@ -882,8 +882,8 @@ process_brickstatus_diffs(degraded = StateName, DiffList, LastBricksStatus,
                                 repairing_brick = undefined}};
        BrickIsInChainNow_p ->
             %% Someone in the current chain changed state, can't be good.
-            if NewStatus /= ok ->
-                    if length(S#state.chain_now) == 1 ->
+            if NewStatus =/= ok ->
+                    if length(S#state.chain_now) =:= 1 ->
                             %% TODO: We probably have the S#state.started brick doing
                             %% something ... what do we do here?  There are two (?) possible
                             %% states:
@@ -909,7 +909,7 @@ process_brickstatus_diffs(degraded = StateName, DiffList, LastBricksStatus,
                true ->
                     exit({process_brickstatus_diffs, todo_should_never_happen, hd(DiffList)})
             end;
-       S#state.repairing_brick == undefined, NewStatus == pre_init ->
+       S#state.repairing_brick =:= undefined, NewStatus =:= pre_init ->
             %% We now have the next brick to re-join the chain.
             ?E_INFO("Chain ~w: current = ~w, adding ~w to end of chain, starting repair",
                     [S#state.chain, S#state.chain_now, Brick]),
@@ -922,8 +922,8 @@ process_brickstatus_diffs(degraded = StateName, DiffList, LastBricksStatus,
             gen_fsm:send_event(self(), {evt_degraded, repairing_brick, Brick}),
             {StateName, S#state{last_bricks_status = NBS,
                                 repairing_brick = Brick}};
-       Brick /= S#state.repairing_brick,
-       OldStatus == unknown, NewStatus == ok ->
+       Brick =/= S#state.repairing_brick,
+       OldStatus =:= unknown, NewStatus =:= ok ->
             %% BZ 27591.  The scenario there:
             %% 1. Brick A starts repairing brick B.
             %% 2. Brick B goes comatose, e.g. bcb_delete_remaining_keys
@@ -954,7 +954,7 @@ process_brickstatus_diffs(degraded = StateName, DiffList, LastBricksStatus,
             %%           PreInitNBS = LastBricksStatus, % Which is the correct one?
             ?DBG_CHAINx({qwer, 6}),
             {StateName, S#state{last_bricks_status = PreInitNBS}};
-       Brick /= S#state.repairing_brick ->
+       Brick =/= S#state.repairing_brick ->
             %% Someone else changed state.  We want to ignore this event,
             %% but if there are other diffs, we should examine them first.
             %% TODO: The above comment isn't 100% true?  Investigate this:
@@ -963,7 +963,7 @@ process_brickstatus_diffs(degraded = StateName, DiffList, LastBricksStatus,
             %%    brick members on host B.
             %% 3. Start the node B.
             %% 4. We end up here, where S#state.repairing_brick,
-            %%    length(DiffList) == 1.
+            %%    length(DiffList) =:= 1.
             %% Short-term fix: kill one of the two bricks, to trigger recovery.
             if length(DiffList) > 1 ->
                     ?DBG_CHAINx({qwer, a3, Brick, LastBricksStatus, NewStatus}),
@@ -990,8 +990,8 @@ process_brickstatus_some_ok(StateName, NewBricksStatus, OK_Bricks, S) ->
             ?E_INFO("Chain ~w: current operating state (ok "
                     "bricks) is ~w with repairing brick ~w",
                     [S#state.chain, ChainList, RepairingBrick]),
-            if length(NewBricksStatus) == length(ChainList),
-               RepairingBrick == undefined ->
+            if length(NewBricksStatus) =:= length(ChainList),
+               RepairingBrick =:= undefined ->
                     NBS = [{Br, ok} || Br <- ChainList],
                     %% Mutual recursion to re-solve this problem.
                     process_brickstatus_diffs(StateName, arg_unused,
@@ -1096,9 +1096,9 @@ stitch_op_state(OpCs) ->
                                          end),
     %% !@#$!, monitors are a pain/verbose.
     Res = receive
-              {Pid, Reply} when Pid == Child -> % !@#$! compiler warning
+              {Pid, Reply} when Pid =:= Child -> % !@#$! compiler warning
                   Reply;
-              {'DOWN', X, _, _, _} when X == MRef -> % !@#$! compiler warning
+              {'DOWN', X, _, _, _} when X =:= MRef -> % !@#$! compiler warning
                   exit(some_kind_of_error)
           end,
     erlang:demonitor(MRef),
@@ -1119,14 +1119,14 @@ stitch_op_state_2(OpCs, ParentPid) ->
 -spec stitch_op_state_3(list(#opconf_r{})) -> {bricklist(), brick() | undefined}.
 stitch_op_state_3(OpCs) ->
     %% Small sanity checks here.
-    true = (length(OpCs) == length(list_uniq(lists:sort(OpCs)))),
-    false = lists:any(fun(O) -> O#opconf_r.role /= chain_member end, OpCs),
+    true = (length(OpCs) =:= length(list_uniq(lists:sort(OpCs)))),
+    false = lists:any(fun(O) -> O#opconf_r.role =/= chain_member end, OpCs),
 
     DownG = digraph:new(),
     UpG = digraph:new(),
     lists:foreach(
       fun(OpC) ->
-              if OpC#opconf_r.downstream /= undefined ->
+              if OpC#opconf_r.downstream =/= undefined ->
                       digraph:add_vertex(DownG, OpC#opconf_r.me),
                       digraph:add_vertex(DownG, OpC#opconf_r.downstream),
                       digraph:add_edge(DownG, OpC#opconf_r.me,
@@ -1134,7 +1134,7 @@ stitch_op_state_3(OpCs) ->
                  true ->
                       ok
               end,
-              if OpC#opconf_r.upstream /= undefined ->
+              if OpC#opconf_r.upstream =/= undefined ->
                       digraph:add_vertex(UpG, OpC#opconf_r.me),
                       digraph:add_vertex(UpG, OpC#opconf_r.upstream),
                       digraph:add_edge(UpG, OpC#opconf_r.me,
@@ -1147,8 +1147,8 @@ stitch_op_state_3(OpCs) ->
     ?DBG_CHAIN("rev topsort up = ~w", [catch lists:reverse(digraph_utils:topsort(UpG))]),
     Tdown = digraph_utils:topsort(DownG),
     Tup = digraph_utils:topsort(UpG),
-    Tup_rev = if Tup == false   -> false;
-                 Tdown == false -> false;
+    Tup_rev = if Tup =:= false   -> false;
+                 Tdown =:= false -> false;
                  true           -> lists:reverse(digraph_utils:topsort(UpG))
               end,
     digraph:delete(DownG),
@@ -1156,7 +1156,7 @@ stitch_op_state_3(OpCs) ->
     %% Coding for expected cases only, all others will fail with
     %% badmatch or if_clause or something.
     %%
-    %% If Tdown == Tup_rev, then the total sequence of downstream links is
+    %% If Tdown =:= Tup_rev, then the total sequence of downstream links is
     %% exactly the same as the reverse of the sequence of upstream links.  If
     %% either sequence is not exactly equivalent to a single linked list
     %% (e.g. cyclic, tree'ish, multiple disjoint graphs, whatever), then the
@@ -1164,15 +1164,15 @@ stitch_op_state_3(OpCs) ->
     %% check for exactly 1 official tail and that the official tail is either
     %% at the end (i.e. no repairing brick) or 2nd-from-the-end (i.e. a
     %% repairing brick).
-    if Tdown /= false, Tdown == Tup_rev ->
-            Sorted = [OpC || X <- Tdown, OpC <- OpCs, OpC#opconf_r.me == X],
+    if Tdown =/= false, Tdown =:= Tup_rev ->
+            Sorted = [OpC || X <- Tdown, OpC <- OpCs, OpC#opconf_r.me =:= X],
             [OffTail] = lists:filter(fun(O) ->
-                                             O#opconf_r.off_tail_p == true
+                                             O#opconf_r.off_tail_p =:= true
                                      end, Sorted),
-            case lists:dropwhile(fun(O) -> O /= OffTail end, Sorted) of
-                [OT] when OT == OffTail ->
+            case lists:dropwhile(fun(O) -> O =/= OffTail end, Sorted) of
+                [OT] when OT =:= OffTail ->
                     {[O#opconf_r.me || O <- Sorted], undefined};
-                [OT, Repairing] when OT == OffTail ->
+                [OT, Repairing] when OT =:= OffTail ->
                     OffChain = lists:sublist(Sorted, length(Sorted) - 1),
                     {[O#opconf_r.me || O <- OffChain], Repairing#opconf_r.me}
             end
@@ -1185,7 +1185,7 @@ substitute_prop(PropList, Key, NewVal) ->
                 -> fun((now_status() | last_status())
                        -> boolean()).
 is_brick_x(Status) ->
-    fun({_B, S}) when S == Status -> true;
+    fun({_B, S}) when S =:= Status -> true;
        (_)                        -> false
     end.
 
@@ -1228,7 +1228,7 @@ do_unknown_timeout_decision(S) when is_record(S, state) ->
     BestBrickIsPreInit_p =
         lists:keymember(BestBrick, 1,
                         lists:filter(fun is_brick_pre_init/1, S#state.last_bricks_status)),
-    if AnyOK_p == true ->
+    if AnyOK_p =:= true ->
             OK_Bricks = [B || {B, _} <-
                                   lists:filter(fun is_brick_ok/1,
                                                S#state.last_bricks_status)],
@@ -1246,9 +1246,9 @@ do_unknown_timeout_decision(S) when is_record(S, state) ->
             %% the next iteration.
             ok = go_start_1chain_sync(BestBrick),
             {next_state, stopped, S};
-       AnyOK_p == false ->
+       AnyOK_p =:= false ->
             [BestStatus] = [BS || {BB, BS} <- S#state.last_bricks_status,
-                                  BB == BestBrick],
+                                  BB =:= BestBrick],
             ?E_INFO("unknown_timeout_decision: ~p: "
                     "best brick is ~p but its status is ~p",
                     [S#state.chain, BestBrick, BestStatus]),
@@ -1342,14 +1342,14 @@ set_all_chain_roles(BrickList, OldBrickList, S) ->
 
     %% Take care of the case where a middle brick died.
     ?DBG_CHAIN("set_all_chain_roles ~w bricklist ~w", [S#state.chain, BrickList]),
-    if BrickList == [] ->
+    if BrickList =:= [] ->
             nothing_to_do;
        true ->
             {NewHead, NewNode} = hd(BrickList),
             {ChainDownSerial, ChainDownAcked} =
                 brick_server:chain_get_downstream_serials(NewHead, NewNode),
-            if ChainDownSerial /= ChainDownAcked ->
-                    ?E_INFO("New head {~w,~w}: ChainDownSerial ~w /= ChainDownAcked ~w, reflushing log downstream",
+            if ChainDownSerial =/= ChainDownAcked ->
+                    ?E_INFO("New head {~w,~w}: ChainDownSerial ~w =/= ChainDownAcked ~w, reflushing log downstream",
                             [NewHead, NewNode, ChainDownSerial, ChainDownAcked]),
                     ?DBG_CHAIN("set_all_chain_roles ~w flush_log ~w ~w", [S#state.chain, NewHead, NewNode]),
                     ok = brick_server:chain_flush_log_downstream(NewHead,
@@ -1448,7 +1448,7 @@ set_all_chain_roles_reorder(ChainName, BrickList, OldBrickList, S) ->
                         brick_hash:all_chains(GH, new),
                     BL = proplists:get_value(ChainName, Cs),
                     ?DBG_CHAIN("set_all_chain_roles_reorder - CCC: chain ~w BL = ~p", [ChainName, BL]),
-                    if BL == BrickList ->
+                    if BL =:= BrickList ->
                             {false, Acc};
                        Acc > 12*50 ->
                             exit({set_all_chain_roles_reorder, timeout,
@@ -1501,7 +1501,7 @@ add_repair_brick_to_end({NewTail, NewTailNode} = _NewTailBrick, S) ->
     ok = set_global_hash_wrapper(NewTail, NewTailNode, GH),
 
     HeadBrick = hd(S#state.chain_now),
-    if HeadBrick == NowLast1Brick ->
+    if HeadBrick =:= NowLast1Brick ->
             %%?DBG_CHAIN("brick_to_end [head] ~w ~w ~w ~w", [NowLast1, NowLast1Node, NewTail, NewTailNode]),
             ok = brick_server:chain_role_head(NowLast1, NowLast1Node,
                                               NewTail, NewTailNode,
@@ -1625,11 +1625,11 @@ info_state_r() ->
 check_difflist_for_disk_error(DiffList, _S) ->
     lists:foreach(
       fun({{_Br, Nd} = Brick, {OldState, NewState}}) ->
-              if NewState == disk_error, OldState /= NewState ->
+              if NewState =:= disk_error, OldState =/= NewState ->
                       rpc:call(Nd, gmt_util, set_alarm,
                                [{disk_error, Brick},
                                 "Administrator intervention is required."]);
-                 OldState == disk_error, OldState /= NewState ->
+                 OldState =:= disk_error, OldState =/= NewState ->
                       rpc:call(Nd, gmt_util, clear_alarm,
                                [{disk_error, Brick}]);
                  true ->
