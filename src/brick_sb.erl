@@ -365,9 +365,9 @@ squorum_multiset(Bricks, KVs) ->
     Ops = [brick_server:make_set(term_to_binary(K),
                                  term_to_binary(V, [{compressed,1}])) ||
               {K, V} <- KVs],
-    Start = now(),
+    Start = os:timestamp(),
     Res = brick_squorum:multiset(Bricks, Ops),
-    End = now(),
+    End = os:timestamp(),
     case timer:now_diff(End, Start) of
         N when N > 100*1000 ->
             ?E_INFO("~s:squorum_set(ops len ~p) was ~p msec\n",

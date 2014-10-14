@@ -78,7 +78,7 @@ bootstrap_config(C) ->
     cluster_info:send(C, Bin).
 
 history_dump(C) ->
-    Tmp = lists:flatten(io_lib:format("/tmp/history.~p", [now()])),
+    Tmp = lists:flatten(io_lib:format("/tmp/history.~p", [os:timestamp()])),
     Res = try
               ok = mod_admin:dump_history(Tmp),
               {ok, Out} = file:read_file(Tmp),

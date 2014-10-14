@@ -214,7 +214,7 @@ state(ServerRef) ->
 %%--------------------------------------------------------------------
 init([Chain, Bricks]) ->
     self() ! finish_init_tasks,
-    _ = random:seed(now()),
+    _ = random:seed(os:timestamp()),
     {ok, Time} = application:get_env(gdss_admin, admin_server_chain_poll),
     {ok, TRef} = brick_itimer:send_interval(Time, check_status),
     SBPid = brick_sb:sb_pid(),
@@ -1542,7 +1542,7 @@ add_repair_brick_to_end({NewTail, NewTailNode} = _NewTailBrick, S) ->
 -spec poll_for_full_sync(brick_name(), node(), integer()) -> ok | {poll_for_full_sync, timeout, integer(), integer()}.
 poll_for_full_sync(Brick, Node, TimeLimit_0) ->
     TimeLimit = TimeLimit_0 * 1000,             % Convert to usec.
-    Start = now(),
+    Start = os:timestamp(),
     SyncPoll =
         fun(Acc) ->
                 case brick_server:chain_get_downstream_serials(Brick, Node) of
@@ -1550,7 +1550,7 @@ poll_for_full_sync(Brick, Node, TimeLimit_0) ->
                         %%io:format("p11 ~p ~p\n", [X, X]),
                         {false, Acc};
                     {X, Y} when is_integer(X), is_integer(Y) ->
-                        case timer:now_diff(now(), Start) of
+                        case timer:now_diff(os:timestamp(), Start) of
                             D when D > TimeLimit ->
                                 {false, {poll_for_full_sync, timeout, X, Y}};
                             _   ->
