@@ -17,6 +17,15 @@
 %%% Purpose : brick admin stuff
 %%%----------------------------------------------------------------------
 
+-ifndef(hibari_dict).
+-define(hibari_dict, true).
+-ifdef(namespaced_dict_and_queue).
+-type hibari_dict()  :: dict:dict().
+-else.
+-type hibari_dict()  :: dict().
+-endif. %% namespaced_dict_and_queue
+-endif. %% hibari_dict
+
 -define(BKEY_SCHEMA_DEFINITION, schema_definition).
 -define(BKEY_CLIENT_MONITOR,    client_monitor_list).
 -define(BKEY_MIGRATION_STATE,   migration_state).
@@ -46,10 +55,10 @@
 
           %% Dictionary of all table definitions
           %% Key = table name, Val = table_r()
-          tabdefs                               :: dict(),
+          tabdefs                               :: hibari_dict(),
 
           %% Mapping of chain to table name
-          chain2tab                             :: dict()
+          chain2tab                             :: hibari_dict()
          }).
 
 -record(table_r, {
