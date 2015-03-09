@@ -26,6 +26,7 @@
 -endif. %% -ifdef(PROPER).
 
 -ifdef(EQC).
+-eqc_group_commands(false).
 -include_lib("eqc/include/eqc.hrl").
 -include_lib("eqc/include/eqc_statem.hrl").
 -define(GMTQC, eqc).
