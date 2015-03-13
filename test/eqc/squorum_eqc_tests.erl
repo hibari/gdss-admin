@@ -21,6 +21,7 @@
 
 -ifdef(QC).
 
+-eqc_group_commands(false).
 -include_lib("qc/include/qc.hrl").
 
 -define(NOTEST, true). %% TEST FAILS

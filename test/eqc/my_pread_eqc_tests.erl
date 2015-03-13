@@ -21,6 +21,7 @@
 
 -ifdef(QC).
 
+-eqc_group_commands(false).
 -include_lib("qc/include/qc.hrl").
 
 -include_lib("kernel/include/file.hrl").
