@@ -1,5 +1,5 @@
 %%%----------------------------------------------------------------------
-%%% Copyright: (c) 2009-2013 Hibari developers.  All rights reserved.
+%%% Copyright (c) 2009-2015 Hibari developers.  All rights reserved.
 %%%
 %%% Licensed under the Apache License, Version 2.0 (the "License");
 %%% you may not use this file except in compliance with the License.
@@ -19,21 +19,10 @@
 
 -module(repair_eqc_tests).
 
--ifdef(PROPER).
--include_lib("proper/include/proper.hrl").
--define(GMTQC, proper).
--undef(EQC).
--endif. %% -ifdef(PROPER).
+-ifdef(QC).
 
--ifdef(EQC).
 -eqc_group_commands(false).
--include_lib("eqc/include/eqc.hrl").
--include_lib("eqc/include/eqc_statem.hrl").
--define(GMTQC, eqc).
--undef(PROPER).
--endif. %% -ifdef(EQC).
-
--ifdef(GMTQC).
+-include_lib("qc/include/qc.hrl").
 
 -compile(export_all).
 
@@ -190,11 +179,27 @@ delete_ir2(Br, Nd, Keys) ->
 
 set_ir(Br, Nd, Key, Val) ->
     [Res] = set_ir2(Br, Nd, [{Key, Val}]),
-    Res.
+    case Res of
+        {ok, _} ->
+            ok;
+        _ ->
+            Res
+    end.
 
 set_ir2(Br, Nd, KVs) ->
     Ops = [brick_server:make_set(Key, Val) || {Key, Val} <- KVs],
-    brick_server:do(Br, Nd, Ops, [ignore_role], 60*1000).
+    Res = brick_server:do(Br, Nd, Ops, [ignore_role], 60*1000),
+    case Res of
+        X when is_list(X) ->
+            [ case R of
+                  {ok, _} ->
+                      ok;
+                  _ ->
+                      R
+              end || R <- Res ];
+        _ ->
+            Res
+    end.
 
 make_old_ir(Br, Nd, Key, Val) ->
     [Res] = make_old_ir2(Br, Nd, [{Key, Val}]),
@@ -204,7 +209,18 @@ make_old_ir2(Br, Nd, KVs) ->
     _XX1 = delete_ir2(Br, Nd, [Key || {Key, _} <- KVs]),
     Ops = [brick_server:make_op6(set, Key, 4242, Val, 0, []) ||
               {Key, Val} <- KVs],
-    brick_server:do(Br, Nd, Ops, [ignore_role], 60*1000).
+    Res = brick_server:do(Br, Nd, Ops, [ignore_role], 60*1000),
+    case Res of
+        X when is_list(X) ->
+            [ case R of
+                  {ok, _} ->
+                      ok;
+                  _ ->
+                      R
+              end || R <- Res ];
+        _ ->
+            Res
+    end.
 
 delete_keys_ir(Br, Nd, DelIdx, KeysT) ->
     Keys = [begin {Key, _TS} = element(Idx, KeysT), Key end || Idx <- DelIdx],
@@ -310,4 +326,4 @@ min(_, Y)            -> Y.
 all_done() ->
     ok.
 
--endif. %% -ifdef(GMTQC).
+-endif. %% -ifdef(QC).

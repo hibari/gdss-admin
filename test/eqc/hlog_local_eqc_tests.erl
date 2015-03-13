@@ -1,5 +1,5 @@
 %%%----------------------------------------------------------------------
-%%% Copyright: (c) 2009-2013 Hibari developers.  All rights reserved.
+%%% Copyright (c) 2009-2015 Hibari developers.  All rights reserved.
 %%%
 %%% Licensed under the Apache License, Version 2.0 (the "License");
 %%% you may not use this file except in compliance with the License.
@@ -19,21 +19,10 @@
 
 -module(hlog_local_eqc_tests).
 
--ifdef(PROPER).
--include_lib("proper/include/proper.hrl").
--define(GMTQC, proper).
--undef(EQC).
--endif. %% -ifdef(PROPER).
+-ifdef(QC).
 
--ifdef(EQC).
 -eqc_group_commands(false).
--include_lib("eqc/include/eqc.hrl").
--include_lib("eqc/include/eqc_statem.hrl").
--define(GMTQC, eqc).
--undef(PROPER).
--endif. %% -ifdef(EQC).
-
--ifdef(GMTQC).
+-include_lib("qc/include/qc.hrl").
 
 -include("gmt_hlog.hrl").
 -include_lib("kernel/include/file.hrl").
@@ -427,4 +416,4 @@ find_first_nonnul(B, Offset) when Offset < size(B) ->
 find_first_nonnul(_, _) ->
     ok.
 
--endif. %% -ifdef(GMTQC).
+-endif. %% -ifdef(QC).

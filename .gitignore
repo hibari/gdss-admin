@@ -1,10 +1,12 @@
+*.HLOG
 *.app
 *.beam
 *.boot
 *.huc
 *.log
 *.script
-*.HLOG
+.eqc-info
 .eunit/
+.qc/
 .rebar/
 erl_crash.dump

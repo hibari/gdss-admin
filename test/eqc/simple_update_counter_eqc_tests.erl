@@ -1,5 +1,5 @@
 %%%-------------------------------------------------------------------
-%%% Copyright (c) 2011-2013 Hibari developers.  All rights reserved.
+%%% Copyright (c) 2011-2015 Hibari developers.  All rights reserved.
 %%%
 %%% Licensed under the Apache License, Version 2.0 (the "License");
 %%% you may not use this file except in compliance with the License.
@@ -13,8 +13,8 @@
 %%% See the License for the specific language governing permissions and
 %%% limitations under the License.
 %%%
-%%% File    : simple_rename_eqc_tests.erl
-%%% Purpose : Simple test to illustrate a client-based rename
+%%% File    : simple_update_counter_eqc_tests.erl
+%%% Purpose : Simple test to illustrate a client-based counter
 %%%           implementation.
 %%%-------------------------------------------------------------------
 
@@ -84,14 +84,14 @@ update_counter2(Tab, Key, Incr, Timeout, Expires) ->
         {ok, TS, Val} ->
             IntVal =
                 try
-                    binary_to_integer(Val)
+                    erlang:binary_to_integer(Val)
                 catch
                     exit:badarg ->
                         undefined
                 end,
             if is_integer(IntVal) ->
                     NewIntVal = update_counter_value(IntVal, Incr),
-                    NewVal = integer_to_binary(NewIntVal),
+                    NewVal = erlang:integer_to_binary(NewIntVal),
                     case brick_simple:replace(Tab, Key, NewVal, 0, [{testset, TS}], Timeout) of
                         ok ->
                             {ok, NewIntVal};
@@ -106,9 +106,9 @@ update_counter2(Tab, Key, Incr, Timeout, Expires) ->
             end;
         key_not_exists ->
             NewIntVal = update_counter_value(0, Incr),
-            NewVal = integer_to_binary(NewIntVal),
+            NewVal = erlang:integer_to_binary(NewIntVal),
             case brick_simple:add(Tab, Key, NewVal, 0, [], Timeout) of
-                ok ->
+                {ok, _} ->
                     {ok, NewIntVal};
                 key_exists ->
                     %% retry

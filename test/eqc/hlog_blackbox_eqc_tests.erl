@@ -1,5 +1,5 @@
 %%%----------------------------------------------------------------------
-%%% Copyright: (c) 2010-2013 Hibari developers.  All rights reserved.
+%%% Copyright (c) 2010-2015 Hibari developers.  All rights reserved.
 %%%
 %%% Licensed under the Apache License, Version 2.0 (the "License");
 %%% you may not use this file except in compliance with the License.
@@ -19,21 +19,10 @@
 
 -module(hlog_blackbox_eqc_tests).
 
--ifdef(PROPER).
--include_lib("proper/include/proper.hrl").
--define(GMTQC, proper).
--undef(EQC).
--endif. %% -ifdef(PROPER).
+-ifdef(QC).
 
--ifdef(EQC).
 -eqc_group_commands(false).
--include_lib("eqc/include/eqc.hrl").
--include_lib("eqc/include/eqc_statem.hrl").
--define(GMTQC, eqc).
--undef(PROPER).
--endif. %% -ifdef(EQC).
-
--ifdef(GMTQC).
+-include_lib("qc/include/qc.hrl").
 
 -export([run/0, run/1]).
 -export([start_noshrink/0, start_noshrink/1]).
@@ -119,25 +108,25 @@ run() ->
     run(500).
 
 run(NumTests) ->
-    ?GMTQC:quickcheck(numtests(NumTests,prop_commands([{parallel,false}]))).
+    ?QC:quickcheck(numtests(NumTests,prop_commands([{parallel,false}]))).
 
 start_noshrink() ->
     start_noshrink(500).
 
 start_noshrink(NumTests) ->
-    ?GMTQC:quickcheck(numtests(NumTests,noshrink(prop_commands([{parallel,false}])))).
+    ?QC:quickcheck(numtests(NumTests,noshrink(prop_commands([{parallel,false}])))).
 
 run_parallel() ->
     run_parallel(500).
 
 run_parallel(NumTests) ->
-    ?GMTQC:quickcheck(numtests(NumTests,prop_commands([{parallel,true}]))).
+    ?QC:quickcheck(numtests(NumTests,prop_commands([{parallel,true}]))).
 
 run_parallel_noshrink() ->
     run_parallel_noshrink(500).
 
 run_parallel_noshrink(NumTests) ->
-    ?GMTQC:quickcheck(numtests(NumTests,noshrink(prop_commands([{parallel,true}])))).
+    ?QC:quickcheck(numtests(NumTests,noshrink(prop_commands([{parallel,true}])))).
 
 %% sample commands
 sample_commands() ->
@@ -158,10 +147,10 @@ counterexample_commands() ->
     counterexample_commands([]).
 
 counterexample_commands(Options) ->
-    counterexample_commands(Options, ?GMTQC:counterexample()).
+    counterexample_commands(Options, ?QC:counterexample()).
 
 counterexample_commands(Options, CounterExample) ->
-    ?GMTQC:check(prop_commands(Options), CounterExample).
+    ?QC:check(prop_commands(Options), CounterExample).
 
 %% counterexample commands read
 counterexample_commands_read(FileName) ->
@@ -170,7 +159,7 @@ counterexample_commands_read(FileName) ->
 
 %% counterexample commands write
 counterexample_commands_write(FileName) ->
-    counterexample_commands_write(FileName, ?GMTQC:counterexample()).
+    counterexample_commands_write(FileName, ?QC:counterexample()).
 
 counterexample_commands_write(FileName, CounterExample) ->
     file:write_file(FileName, io_lib:format("~p.", [CounterExample])).
@@ -1029,4 +1018,4 @@ do(Pid, F) ->
             {'EXIT', timeout}
     end.
 
--endif. %% -ifdef(GMTQC).
+-endif. %% -ifdef(QC).
