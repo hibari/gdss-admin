@@ -22,7 +22,7 @@
 -ifdef(QC).
 
 -eqc_group_commands(false).
--include_lib("qc/include/qc.hrl").
+-include_lib("qc/include/qc_statem.hrl").
 
 -define(NOTEST, true). %% TEST FAILS
 
@@ -62,7 +62,7 @@ run() ->
     run(500).
 
 run(NumTests) ->
-    gmt_eqc:module({numtests,NumTests}, ?MODULE).
+    qc_statem:qc_run(?MODULE, NumTests, []).
 
 start_bricks(Bricks) ->
     [catch start_brick(B) || B <- Bricks].

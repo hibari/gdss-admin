@@ -22,7 +22,7 @@
 -ifdef(QC).
 
 -eqc_group_commands(false).
--include_lib("qc/include/qc.hrl").
+-include_lib("qc/include/qc_statem.hrl").
 
 -include_lib("kernel/include/file.hrl").
 
@@ -32,7 +32,7 @@ run() ->
     run(500).
 
 run(NumTests) ->
-    gmt_eqc:module({numtests,NumTests}, ?MODULE).
+    qc_statem:qc_run(?MODULE, NumTests, []).
 
 -record(state, {
           size_f1,
