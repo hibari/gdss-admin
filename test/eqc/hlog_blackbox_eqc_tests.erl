@@ -177,8 +177,8 @@ init() ->
     ok.
 
 -spec init(#state{}) -> ok.
-init(S) ->
-    commands_teardown(undefined, S),
+init(_S) ->
+    commands_setup(true),
     ok.
 
 command(_S) ->
@@ -666,10 +666,6 @@ filter_reply({'EXIT',{Err,_}}) ->
 filter_reply(_) ->
     ok.
 
--spec stop(#state{}, #state{}) -> ok.
-stop(_State0, _State) ->
-    ok.
-
 %% @doc setup helper
 commands_setup(_Hard) ->
     %% start
@@ -689,25 +685,12 @@ commands_setup(_Hard) ->
     {ok,[]} = gmt_otp:reload_config(),
     {ok,noop}.
 
-%% %% @doc teardown helper
-%% commands_teardown(_) ->
-%%     ok.
-
-%% @doc teardown helper
-commands_teardown(_,undefined) ->
+-spec stop(#state{}, #state{}) -> ok.
+stop(_State0, undefined) ->
     ok;
-commands_teardown(_,#state{pids=Pids}) ->
+stop(_State0, #state{pids=Pids}) ->
     %% cleanup - pids
     [ catch kill(Pid) || Pid <- Pids ],
-    ok;
-commands_teardown(_, _) ->
-    %% Hibari:
-    %%     {function_clause,
-    %%         [{hlog_blackbox_eqc_tests,commands_teardown,
-    %%              [noop,
-    %%               {state,hlog_blackbox_eqc_tests,{eqc_gen,#Fun<eqc_gen.18.111733221>}}]},
-    %%          {gmt_eqc_statem,'-gmt_run_commands/2-fun-7-',3},
-    %%          .....
     ok.
 
 
