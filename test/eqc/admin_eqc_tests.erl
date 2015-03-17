@@ -372,7 +372,8 @@ sync_chains(S) ->
                     length(S#state.idling_bricks) ==
                     length(lists:takewhile(fun ready/1, S#state.idling_bricks))
         end,
-    ok = until(F, ?RINTERVAL, 10),
+    MaxRetry = 16,
+    ok = until(F, ?RINTERVAL, MaxRetry),
     S#state.chains.
 
 -ifndef(DEBUG_QC).
