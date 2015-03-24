@@ -1108,7 +1108,7 @@ write_bootstrap_kv(BrickList, Key0, Val0, add) ->
     Key = term_to_binary(Key0),
     Val = term_to_binary(Val0),
     TS  = brick_server:make_timestamp(),
-    Add = brick_server:make_add(Key, TS, Value, 0, []).
+    Add = brick_server:make_add(Key, TS, Val, 0, []),
     Res = lists:map(
             fun({Brick, Node} = B) ->
                     catch start_standalone_brick(B),
