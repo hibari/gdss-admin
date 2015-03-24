@@ -78,14 +78,13 @@ start_brick({Br, _Nd} = Brick) ->
     ok.
 
 prop_squorum1() ->
-    %% io:format("\n\n\nDon't forget to run ~s:start_bricks() before using.\n\n",
-    %%           [?MODULE]),
-    %% timer:sleep(1234),
+    brick_eunit_utils:setup_and_bootstrap(),
+    error_logger:delete_report_handler(error_logger_tty_h),
     ?LET(NumBricks, oneof([2, 3, 5, 7]),
          ?LET(Pivot, choose(1, NumBricks),
               begin
                   Bricks = lists:sublist(?BRICKS, NumBricks),
-                  start_bricks(Bricks),
+                  _ = start_bricks(Bricks),
                   %% timer:sleep(1000),
                   %% "Cut the deck" around a pivot position, to
                   %% simulate shuffling the list of bricks, but we
