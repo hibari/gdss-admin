@@ -29,7 +29,7 @@ run() ->
     run(30000).
 
 run(NumTests) ->
-    gmt_eqc:module({numtests,NumTests}, ?MODULE).
+    qc_statem:qc_run(?MODULE, NumTests, []).
 
 %%-define(MARGIN, 0.0000000000000001). % fails
 -define(MARGIN, 0.00000000000001).   % works

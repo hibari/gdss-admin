@@ -20,7 +20,8 @@
 -module(brick_test0).
 
 -ifdef(QC).
--include_lib("qc/include/qc.hrl").
+-eqc_group_commands(false).
+-include_lib("qc/include/qc_statem.hrl").
 -endif. %% -ifdef(QC).
 
 -include("brick.hrl").

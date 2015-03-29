@@ -48,7 +48,7 @@ setup(Verbose) ->
     ok = application:set_env(sasl, errlog_type, error),
     ok = application:set_env(gdss_brick, brick_max_log_size_mb, 1),
     ok = application:set_env(gdss_brick, brick_min_log_size_mb, 1),
-    [ application:start(A) || A <- lists:reverse(?APPS) ],
+    [ ok = application:start(A) || A <- lists:reverse(?APPS) ],
     if Verbose ->
             noop;
        true ->

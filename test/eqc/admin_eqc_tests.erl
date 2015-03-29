@@ -22,7 +22,7 @@
 -ifdef(QC).
 
 -eqc_group_commands(false).
--include_lib("qc/include/qc.hrl").
+-include_lib("qc/include/qc_statem.hrl").
 
 -include("brick_hash.hrl").
 
@@ -50,8 +50,7 @@ run() ->
     run(500).
 
 run(NumTests) ->
-    brick_eunit_utils:setup_and_bootstrap(),
-    gmt_eqc:module({numtests,NumTests}, ?MODULE).
+    qc_statem:qc_run(?MODULE, NumTests, []).
 
 %% props %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
 prop_0() ->
@@ -62,6 +61,8 @@ prop_0() ->
                  []).
 
 common1_prop(F_check, Env) ->
+    brick_eunit_utils:setup_and_bootstrap(),
+    error_logger:delete_report_handler(error_logger_tty_h),
     ?FORALL(Cmds, commands(?MODULE),
             collect(length(Cmds),
                     begin
@@ -371,7 +372,8 @@ sync_chains(S) ->
                     length(S#state.idling_bricks) ==
                     length(lists:takewhile(fun ready/1, S#state.idling_bricks))
         end,
-    ok = until(F, ?RINTERVAL, 10),
+    MaxRetry = 16,
+    ok = until(F, ?RINTERVAL, MaxRetry),
     S#state.chains.
 
 -ifndef(DEBUG_QC).

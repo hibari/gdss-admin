@@ -30,7 +30,7 @@ run() ->
     run(500).
 
 run(NumTests) ->
-    gmt_eqc:module({numtests,NumTests}, ?MODULE).
+    qc_statem:qc_run(?MODULE, NumTests, []).
 
 prop_repair(KeyDataFile, ChainName, HeadBrick, TailBricks) ->
     %% Setup before ?FORALL
