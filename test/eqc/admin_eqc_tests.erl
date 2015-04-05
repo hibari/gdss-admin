@@ -1,5 +1,5 @@
 %%%----------------------------------------------------------------------
-%%% Copyright: (c) 2009-2013 Hibari developers.  All rights reserved.
+%%% Copyright (c) 2009-2015 Hibari developers.  All rights reserved.
 %%%
 %%% Licensed under the Apache License, Version 2.0 (the "License");
 %%% you may not use this file except in compliance with the License.
@@ -19,20 +19,10 @@
 
 -module(admin_eqc_tests).
 
--ifdef(PROPER).
--include_lib("proper/include/proper.hrl").
--define(GMTQC, proper).
--undef(EQC).
--endif. %% -ifdef(PROPER).
+-ifdef(QC).
 
--ifdef(EQC).
--include_lib("eqc/include/eqc.hrl").
--include_lib("eqc/include/eqc_statem.hrl").
--define(GMTQC, eqc).
--undef(PROPER).
--endif. %% -ifdef(EQC).
-
--ifdef(GMTQC).
+-eqc_group_commands(false).
+-include_lib("qc/include/qc_statem.hrl").
 
 -include("brick_hash.hrl").
 
@@ -60,8 +50,7 @@ run() ->
     run(500).
 
 run(NumTests) ->
-    brick_eunit_utils:setup_and_bootstrap(),
-    gmt_eqc:module({numtests,NumTests}, ?MODULE).
+    qc_statem:qc_run(?MODULE, NumTests, []).
 
 %% props %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
 prop_0() ->
@@ -72,6 +61,8 @@ prop_0() ->
                  []).
 
 common1_prop(F_check, Env) ->
+    brick_eunit_utils:setup_and_bootstrap(),
+    error_logger:delete_report_handler(error_logger_tty_h),
     ?FORALL(Cmds, commands(?MODULE),
             collect(length(Cmds),
                     begin
@@ -381,7 +372,8 @@ sync_chains(S) ->
                     length(S#state.idling_bricks) ==
                     length(lists:takewhile(fun ready/1, S#state.idling_bricks))
         end,
-    ok = until(F, ?RINTERVAL, 10),
+    MaxRetry = 16,
+    ok = until(F, ?RINTERVAL, MaxRetry),
     S#state.chains.
 
 -ifndef(DEBUG_QC).
@@ -411,4 +403,4 @@ deladd() ->
     io:format("ADD:: ~p~n",[brick_admin:change_chain_length(CN, Old)]),
     io:format("---:: ~p~n", [catch brick_server:status(B, node()) ]).
 
--endif. %% -ifdef(GMTQC).
+-endif. %% -ifdef(QC).

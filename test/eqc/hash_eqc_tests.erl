@@ -1,5 +1,5 @@
 %%%----------------------------------------------------------------------
-%%% Copyright: (c) 2009-2013 Hibari developers.  All rights reserved.
+%%% Copyright (c) 2009-2015 Hibari developers.  All rights reserved.
 %%%
 %%% Licensed under the Apache License, Version 2.0 (the "License");
 %%% you may not use this file except in compliance with the License.
@@ -19,19 +19,9 @@
 
 -module(hash_eqc_tests).
 
--ifdef(PROPER).
--include_lib("proper/include/proper.hrl").
--define(GMTQC, proper).
--undef(EQC).
--endif. %% -ifdef(PROPER).
+-ifdef(QC).
 
--ifdef(EQC).
--include_lib("eqc/include/eqc.hrl").
--define(GMTQC, eqc).
--undef(PROPER).
--endif. %% -ifdef(EQC).
-
--ifdef(GMTQC).
+-include_lib("qc/include/qc.hrl").
 
 -compile(export_all).
 
@@ -39,7 +29,7 @@ run() ->
     run(30000).
 
 run(NumTests) ->
-    gmt_eqc:module({numtests,NumTests}, ?MODULE).
+    qc_statem:qc_run(?MODULE, NumTests, []).
 
 %%-define(MARGIN, 0.0000000000000001). % fails
 -define(MARGIN, 0.00000000000001).   % works
@@ -181,4 +171,4 @@ gb_next_always_works(NextFloatList, GbTree) ->
         end,
     lists:all(F, lists:zip(NextFloatList, SecondForPair)).
 
--endif. %% -ifdef(GMTQC).
+-endif. %% -ifdef(QC).

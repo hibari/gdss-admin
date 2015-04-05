@@ -1,5 +1,5 @@
 %%%-------------------------------------------------------------------
-%%% Copyright (c) 2008-2013 Hibari developers.  All rights reserved.
+%%% Copyright (c) 2008-2015 Hibari developers.  All rights reserved.
 %%%
 %%% Licensed under the Apache License, Version 2.0 (the "License");
 %%% you may not use this file except in compliance with the License.
@@ -169,7 +169,7 @@
 -type create_new_schema_ret() :: {ok,any()} | error().
 -type serverref() :: file:name() | {file:name(),atom()} | {global,atom()} | pid().
 
--spec add_client_monitor(atom()) -> ok.
+-spec add_client_monitor(atom()) -> brick_server:set_reply().
 -spec add_table(atom(),chainlist()) -> add_table_ret().
 -spec add_table(atom(),chainlist(),proplist()) -> add_table_ret();
                (serverref(),atom(),proplist()) -> add_table_ret().
@@ -1107,14 +1107,16 @@ do_create_new_schema2(InitialBrickList, _PropList) ->
 write_bootstrap_kv(BrickList, Key0, Val0, add) ->
     Key = term_to_binary(Key0),
     Val = term_to_binary(Val0),
-    Op = my_make_add(Key, Val),
-    TS = brick_server:get_op_ts(Op),
+    TS  = brick_server:make_timestamp(),
+    Add = brick_server:make_add(Key, TS, Val, 0, []),
     Res = lists:map(
             fun({Brick, Node} = B) ->
                     catch start_standalone_brick(B),
-                    case catch brick_server:do(Brick, Node, [Op]) of
+                    case catch brick_server:do(Brick, Node, [Add]) of
                         {'EXIT', {Reason, _}} ->
                             {B, Reason};
+                        [{ok, _}] ->
+                            {B, ok};
                         [Res] ->
                             {B, Res}
                     end
@@ -1159,19 +1161,6 @@ do_copy_new_schema3(File, FileData) ->
     {_, _, {ok, FileData}} =
         {should_exist, File1, file:read_file(File1)},
     ok.
-
-%% @spec (term(), term()) -> term()
-%% @doc A common make_add() so all uses of this op have the same tstamp.
-
-my_make_add(Key, Value) ->
-    brick_server:make_add(Key, Value).
-
-% my_make_replace(Key, Value, OldTS) ->
-%     brick_server:make_replace(Key, Value, exp_unused, [{testset, OldTS}]).
-
-%% %% TODO move to brick_server?
-%% get_ts_from_op6(Op6) when is_tuple(Op6), size(Op6) == 6 ->
-%%     element(3, Op6).
 
 %% @doc Sanity checking:
 %% <ul>
@@ -1280,7 +1269,7 @@ do_add_table2(TableName, ChainList, BrickOptions, S) ->
 
             case squorum_set(Schema#schema_r.schema_bricklist,
                              ?BKEY_SCHEMA_DEFINITION, NewSchema) of
-                ok ->
+                {ok, _} ->
                     spam_gh_to_all_nodes(self(), TableName),
                     async_start_pingers_and_chmons(NewSchema),
                     %% Ok, we're finally done.
@@ -1410,8 +1399,8 @@ do_chain_status_change(ChainName, Status, PropList, S) ->
             GH = T#table_r.ghash,
             NewGH = brick_hash:update_chain_dicts(GH, ChainName, ChainNow),
             NewSchema = update_tab_ghash(TableName, T, NewGH, Schema),
-            ok = squorum_set(Schema#schema_r.schema_bricklist,
-                             ?BKEY_SCHEMA_DEFINITION, NewSchema),
+            {ok, _} = squorum_set(Schema#schema_r.schema_bricklist,
+                                  ?BKEY_SCHEMA_DEFINITION, NewSchema),
             spam_gh_to_all_nodes(self(), TableName),
             S#state{schema = NewSchema};
         _ ->
@@ -1431,7 +1420,7 @@ do_set_gh_minor_rev(State) ->
                                        {NewS, [{TableName, MR, Timestamp}|RList]}
                                    end, {Schema, []}, Schema#schema_r.tabdefs),
     %% Save the schema to the quorum
-    ok = squorum_set(NewSchema#schema_r.schema_bricklist, ?BKEY_SCHEMA_DEFINITION, NewSchema),
+    {ok, _} = squorum_set(NewSchema#schema_r.schema_bricklist, ?BKEY_SCHEMA_DEFINITION, NewSchema),
     %% Update the state and reply
     {Reply, State#state{schema = NewSchema}}.
 
@@ -1453,7 +1442,7 @@ do_add_bootstrap_copy(BrickList, State) ->
             ok = file:rename(BootstrapFile, OldFile),
             ok = write_schema_bootstrap_file(BootstrapFile, NewBootList),
             %% Save the schema to the combined new bricklist quorum
-            ok = squorum_set(NewSchema#schema_r.schema_bricklist, ?BKEY_SCHEMA_DEFINITION, NewSchema),
+            {ok, _} = squorum_set(NewSchema#schema_r.schema_bricklist, ?BKEY_SCHEMA_DEFINITION, NewSchema),
             {{ok,NewBootList}, State#state{schema = NewSchema}}
     end.
 
@@ -1617,8 +1606,8 @@ do_change_chain_length(ChainName, NewBrickList, S) ->
             NewGH_3 = NewGH_2#g_hash_r{minor_rev = OldGH#g_hash_r.minor_rev+1},
 
             NewSchema = update_tab_ghash(TableName, T, NewGH_3, Schema),
-            ok = squorum_set(NewSchema#schema_r.schema_bricklist,
-                             ?BKEY_SCHEMA_DEFINITION, NewSchema),
+            {ok, _} = squorum_set(NewSchema#schema_r.schema_bricklist,
+                                  ?BKEY_SCHEMA_DEFINITION, NewSchema),
             spam_gh_to_all_nodes(self()),
             NewS = S#state{schema = NewSchema},
             %% Use this try/catch to *always* return NewS, which is
@@ -1711,8 +1700,8 @@ do_start_migration(TableName, NewLH, Options, S) ->
                            migration_options = Options},
             Schema2 = Schema#schema_r{chain2tab = NewCh2Tab},
             NewSchema = update_tab_ghash(TableName, T2, NewGH, Schema2),
-            ok = squorum_set(Schema#schema_r.schema_bricklist,
-                             ?BKEY_SCHEMA_DEFINITION, NewSchema),
+            {ok, _} = squorum_set(Schema#schema_r.schema_bricklist,
+                                  ?BKEY_SCHEMA_DEFINITION, NewSchema),
             spam_gh_to_all_nodes(self(), TableName),
             async_start_pingers_and_chmons(NewSchema),
             {ok, MPid} = brick_migmon:start_link(T2, Options),
@@ -1798,8 +1787,8 @@ do_table_finished_migration_cleanup(TableName, OldOnlyChNames, OldOnlyBricks,
               end, NewGH_1, brick_hash:all_chains(OldGH, new)),
     T2 = T#table_r{current_rev = NewRev, current_phase = pre},
     NewSchema = update_tab_ghash(TableName, T2, NewGH, Schema),
-    ok = squorum_set(NewSchema#schema_r.schema_bricklist,
-                     ?BKEY_SCHEMA_DEFINITION, NewSchema),
+    {ok, _} = squorum_set(NewSchema#schema_r.schema_bricklist,
+                          ?BKEY_SCHEMA_DEFINITION, NewSchema),
     spam_gh_to_all_nodes(self(), TableName),
     ParentPid = self(),
     spawn(fun() ->

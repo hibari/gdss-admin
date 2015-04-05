@@ -1,5 +1,5 @@
 %%%----------------------------------------------------------------------
-%%% Copyright: (c) 2009-2013 Hibari developers.  All rights reserved.
+%%% Copyright (c) 2009-2015 Hibari developers.  All rights reserved.
 %%%
 %%% Licensed under the Apache License, Version 2.0 (the "License");
 %%% you may not use this file except in compliance with the License.
@@ -19,46 +19,89 @@
 
 -module(simple_eqc_tests).
 
--ifdef(PROPER).
--include_lib("proper/include/proper.hrl").
--define(GMTQC, proper).
--undef(EQC).
--endif. %% -ifdef(PROPER).
+-ifdef(QC).
 
--ifdef(EQC).
--include_lib("eqc/include/eqc.hrl").
--include_lib("eqc/include/eqc_statem.hrl").
--define(GMTQC, eqc).
--undef(PROPER).
--endif. %% -ifdef(EQC).
+-eqc_group_commands(false).
+-include_lib("qc/include/qc_statem.hrl").
 
--ifdef(GMTQC).
+-export([run/0]).
+-compile(export_all).
 
 -include("brick_hash.hrl").
 -include("brick_public.hrl").
 
--compile(export_all).
+%% qc_statem Callbacks
+%% -behaviour(qc_statem).
+-export([command/1]).
+-export([initial_state/0, initial_state/1, next_state/3, invariant/1, precondition/2, postcondition/3]).
+-export([init/0, init/1, stop/2, aggregate/1]).
 
-%% eqc_statem callbacks
--export([initial_state/0, command/1, precondition/2, postcondition/3,
-         next_state/3]).
 
 %%%% -define(MAX_KEYS, 10).
 -define(MAX_KEYS, 4).
 -define(TABLE, tab1).
 
+-type proplist() :: proplists:proplist().
+-type orddict() :: term().
+
+-type key() :: iolist() | string() | binary().
+-type val() :: binary().
+-type exp_time() :: integer().
+-type timestamp() :: integer().
+
+-type do_flag() :: witness.
+-type get_flag() :: get_all_attribs.
+-type mod_flag() :: {exp_time_directive, keep | replace}
+                  | {attrib_directive, keep | replace}.
+
+-type op_flag() :: do_flag() | get_flag() | mod_flag().
+-type attribute() :: {atom() | term()}.
+
+-type write_operation() :: simple_set | simple_add | simple_replace | simple_rename
+                         | simple_delete.
+-type read_opetation() :: simple_get | simple_get_many.
+-type do_operation() :: simple_do.
+-type brick_operation() :: trigger_checkpoint | set_do_sync | scavenge
+                         | sync_down_the_chain | crash_brick.
+
+-type qc_command() :: {call, module(),
+                       write_operation() | read_opetation() | do_operation() | brick_operation(),
+                       [term()]}.
+-type do_command() :: {write_operation() | read_opetation() | do_operation() | brick_operation(),
+                       [term()]}.
+
 -record(state, {
-          step = 1,
-          dict,                         %% key = term(),
-          %% val = [term()] of possible vals
-          bricks                        %% list(brick_names())
+          step = 1 :: integer(),
+          exp_times :: orddict(),  %% key :: term(), val :: integer()
+          values :: orddict(),     %% key :: term(), val :: [term()] of possible vals
+          attributes :: orddict(), %% key :: term(), val :: [attribute()]
+          bricks                   %% [brick_names()]
          }).
+-type state() :: #state{}.
+-type symbolic_state() :: state().
+-type dynamic_state() :: state().
+
+%% run from eunit
+eunit_test_() ->
+    qc:eunit_module(?MODULE, 3000).
+
+-spec init() -> ok.
+init() ->
+    ok.
+
+-spec init(#state{}) -> ok.
+init(_State) ->
+    ok.
+
+-spec stop(#state{}, #state{}) -> ok.
+stop(_State0, _State) ->
+    ok.
 
 run() ->
     run(500).
 
 run(NumTests) ->
-    gmt_eqc:module({numtests,NumTests}, ?MODULE).
+    qc_statem:qc_run(?MODULE, NumTests, []).
 
 prop_simple1() ->
     common1_prop(fun(X, S) -> X == ok andalso ets_table_sizes_match_p(S) end,
@@ -86,8 +129,10 @@ prop_simple1_noproc_ok() ->
                  end, []).
 
 common1_prop(F_check, Env) ->
-    io:format("\n\nHibari: get_many() has been commented out from command()\n\n"),
+    error_logger:delete_report_handler(error_logger_tty_h),
+    setup(),
     timer:sleep(2000),
+    io:format("\n\nHibari: get_many() has been commented out from command()\n\n"),
     ?FORALL(Cmds, commands(?MODULE),
             collect({length(Cmds) div 10, div10},
                     begin
@@ -101,10 +146,29 @@ common1_prop(F_check, Env) ->
                                   F_check(Res, S))
                     end)).
 
-%% initial_state() :: symbolic_state().
-%% Called in symbolic context.
+setup() ->
+    %% true to enable sasl output
+    X = brick_eunit_utils:setup_and_bootstrap(false),
+    X.
 
+teardown(X) ->
+    brick_eunit_utils:teardown(X),
+    ok.
+
+setup_noop() ->
+    %% disable sasl output
+    error_logger:delete_report_handler(error_logger_tty_h),
+    ok.
+
+teardown_noop(_X) ->
+    ok.
+
+-spec initial_state() -> #state{}.
 initial_state() ->
+    initial_state([]).
+
+-spec initial_state(proplist()) -> #state{}.
+initial_state(_Options) ->
     QQQ = now(),
     gmt_loop:do_while(
       fun(_Acc) ->
@@ -121,45 +185,55 @@ initial_state() ->
                       {true, x}
               end
       end, x),
-    L = [{make_key(X), []} || X <- lists:seq(1, ?MAX_KEYS)],
+    ExpTime = [{to_binary(make_key_iolist(X)), undefined} || X <- lists:seq(1, ?MAX_KEYS)],
+    Values  = [{to_binary(make_key_iolist(X)), []}        || X <- lists:seq(1, ?MAX_KEYS)],
+    Attribs = [{to_binary(make_key_iolist(X)), undefined} || X <- lists:seq(1, ?MAX_KEYS)],
     {ok, Ps} = brick_admin:get_table_info(brick_admin, ?TABLE, 10*1000),
     GH = proplists:get_value(ghash, Ps),
     AllChains =
         (GH#g_hash_r.current_h_desc)#hash_r.healthy_chainlist ++
         (GH#g_hash_r.new_h_desc)#hash_r.healthy_chainlist,
     AllBricks = [B || {_ChainName,Bricks} <- AllChains, B <- Bricks],
-    #state{dict = orddict:from_list(L),
-           bricks = lists:usort(AllBricks)}.
+    #state{exp_times  = orddict:from_list(ExpTime),
+           values     = orddict:from_list(Values),
+           attributes = orddict:from_list(Attribs),
+           bricks     = lists:usort(AllBricks)}.
 
 delete_all_max_keys() ->
-    L = [{make_key(X), []} || X <- lists:seq(1, ?MAX_KEYS)],
+    L = [{to_binary(make_key_iolist(X)), []} || X <- lists:seq(1, ?MAX_KEYS)],
     [_ = is_ok_notex(catch brick_simple:delete(?TABLE, K)) || {K, _} <- L],
     %% io:format("ALL DELETED\n"),
     ok.
 
-%% command :: (S::symbolic_state()) :: gen(call() | stop)
-%% Called in symbolic context.
 
+%% Called in symbolic context.
+-spec command(symbolic_state()) -> qc_command().
 command(S) ->
     ?LET(Exp, make_exp(S),
          frequency(
-           [{20,  {call, ?MODULE, simple_set, [random_key(), random_val(),
-                                               Exp, random_mod_flags()]}},
-            {20,  {call, ?MODULE, simple_add, [random_key(), random_val(),
-                                               Exp, random_mod_flags()]}},
-            {20,  {call, ?MODULE, simple_replace, [random_key(), random_val(),
-                                                   Exp, random_mod_flags()]}},
+           [{20,  {call, ?MODULE, simple_set,     [random_key(), random_val(), Exp,
+                                                   random_mod_flags(simple_set),
+                                                   random_attributes()]}},
+            {20,  {call, ?MODULE, simple_add,     [random_key(), random_val(), Exp,
+                                                   random_mod_flags(simple_add),
+                                                   random_attributes()]}},
+            {20,  {call, ?MODULE, simple_replace, [random_key(), random_val(), Exp,
+                                                   random_mod_flags(simple_replace),
+                                                   random_attributes()]}},
+            {20,  {call, ?MODULE, simple_rename,  [random_key(), random_key(), Exp,
+                                                   random_mod_flags(simple_rename),
+                                                   random_attributes()]}},
             %% We need more gets than the others because they're needed to help
             %% detect consistency errors if/when migration and or brick failures
             %% are happening while we're running.
-            {100,  {call, ?MODULE, simple_get, [random_key(), random_get_flags()]}},
+            {100, {call, ?MODULE, simple_get,    [random_key(), random_get_flags()]}},
             {10,  {call, ?MODULE, simple_delete, [random_key()]}},
-            {25,  {call, ?MODULE, simple_do, [list(random_do(S)), random_do_flags()]}},
-            %%        {10,  {call, ?MODULE, simple_get_many, [random_many_key(), nat()]}},
+            {25,  {call, ?MODULE, simple_do,     [list(random_do(S)), random_do_flags()]}},
+            %% {10,  {call, ?MODULE, simple_get_many, [random_many_key(), nat()]}},
             {2,   {call, ?MODULE, trigger_checkpoint, [oneof(S#state.bricks)]}},
 
             %% 2-tier storage and sync changing isn't good, yet.
-            %%        {1,   {call, ?MODULE, set_do_sync, [oneof(S#state.bricks),
+            %% {1,   {call, ?MODULE, set_do_sync, [oneof(S#state.bricks),
             %%                                          oneof([true, false])]}},
             {3,   {call, ?MODULE, scavenge, [oneof(S#state.bricks)]}},
             {3,   {call, ?MODULE, sync_down_the_chain, [oneof(S#state.bricks)]}}
@@ -167,44 +241,67 @@ command(S) ->
             %% {1,   {call, ?MODULE, crash_brick, [oneof(S#state.bricks)]}},
            ])).
 
+-spec random_do(symbolic_state()) -> do_command().
 random_do(S) ->
     ?LET(Exp, make_exp(S),
          frequency(
            [
-            {20, {simple_set, [random_key(), random_val(), Exp, random_mod_flags()]}},
-            {20, {simple_add, [random_key(), random_val(), Exp, random_mod_flags()]}},
-            {20, {simple_replace, [random_key(), random_val(), Exp, random_mod_flags()]}},
+            {20, {simple_set,     [random_key(), random_val(), Exp,
+                                   random_mod_flags(simple_set), random_attributes()]}},
+            {20, {simple_add,     [random_key(), random_val(), Exp,
+                                   random_mod_flags(simple_add), random_attributes()]}},
+            {20, {simple_replace, [random_key(), random_val(), Exp,
+                                   random_mod_flags(simple_replace), random_attributes()]}},
+            {20, {simple_rename,  [random_key(), random_key(), Exp,
+                                   random_mod_flags(simple_rename), random_attributes()]}},
             %% Hibari temp hack: get can timeout at end of migrations, so we'll
             %%                avoid the problem for now.
             %%        {25, {simple_get, [random_key(), random_get_flags()]}},
-            {10, {simple_delete, [random_key()]}}
+            {10, {simple_delete,  [random_key()]}}
            ])).
 
+-spec random_do_flags() -> [do_flag()].
 random_do_flags() ->
+    frequency([{10, []}, {5, [witness]}]).
     %% I think that sync_override is broken.
-    [].
+    %% [].
 %%     ?LET({F1, F2}, {frequency([{10, []}, {5, [{sync_override, bool()}]}]),
 %%                   frequency([{10, []}, {5, [ignore_role_bad_idea_delme]}])},
 %%        F1 ++ F2).
 
+-spec random_get_flags() -> [get_flag()].
 random_get_flags() ->
     oneof([[], [get_all_attribs]]).
 
-random_mod_flags() ->
-%%%oneof([[], [value_in_ram]]).
+-spec random_mod_flags(write_operation()) -> [mod_flag()].
+random_mod_flags(Op)
+  when Op =:= simple_set;
+       Op =:= simple_replace;
+       Op =:= simple_rename ->
+  ?LET(Flags, [ oneof([ [], [{exp_time_directive, keep}], [{exp_time_directive, replace}] ]),
+                oneof([ [], [{attrib_directive, keep}], [{attrib_directive, replace}] ]) ],
+       lists:flatten(Flags));
+random_mod_flags(_) ->
     [].
 
+-spec random_attributes() -> [attribute()].
+random_attributes() ->
+    oneof([ [], [{oneof([attrib1, attrib2, attrib3]),
+                  oneof(["val1", "val2", "val3"])}] ]).
+
+-spec random_many_key() -> binary().
 random_many_key() ->
     frequency([{1, list_to_binary(key_prefix())}, {3, random_key()}]).
 
-%% precondition(S::symbolic_state(), C::call()) :: bool()
 %% Called in symbolic (??) & runtime context.
-
-precondition(_S, {call, _, simple_set, [_Key, _Val, _Exp, _Flags]}) ->
+-spec precondition(S::symbolic_state(), C::qc_command()) -> boolean().
+precondition(_S, {call, _, simple_set, [_Key, _Val, _Exp, _Flags, _Attribs]}) ->
     true;
-precondition(_S, {call, _, simple_add, [_Key, _Val, _Exp, _Flags]}) ->
+precondition(_S, {call, _, simple_add, [_Key, _Val, _Exp, _Flags, _Attribs]}) ->
     true;
-precondition(_S, {call, _, simple_replace, [_Key, _Val, _Exp, _Flags]}) ->
+precondition(_S, {call, _, simple_replace, [_Key, _Val, _Exp, _Flags, _Attribs]}) ->
+    true;
+precondition(_S, {call, _, simple_rename, [_OldKey, _NewKey, _Exp, _Flags, _Attribs]}) ->
     true;
 precondition(_S, {call, _, simple_get, [_Key, _Flags]}) ->
     true;
@@ -235,9 +332,8 @@ precondition(_S, Call) ->
     timer:sleep(1000),
     false.
 
-%% postcondition(S::dynamic_state(),C::call(),R::term()) :: bool()
 %% Called in runtime context.
-
+-spec postcondition(S::dynamic_state(), C::qc_command(), R::term()) -> boolean().
 postcondition(_S, _C, {'EXIT', {shutdown, {gen_server, call, _}}}) ->
     true;
 postcondition(_S, _C, {'EXIT', {noproc, {gen_server, call, _}}}) ->
@@ -256,50 +352,66 @@ postcondition(S, C, R) ->
             false
     end.
 
-postcondition2(_S, {call, _, simple_set, [_Key, _Val, _Exp, _Flags]} = _C, R) ->
+-spec postcondition2(S::dynamic_state(), C::qc_command(), R::term()) -> boolean().
+postcondition2(_S, {call, _, simple_set, [_Key, _Val, _Exp, _Flags, _Attribs]} = _C, R) ->
     case R of
         _ ->
             is_ok(R)
     end;
-postcondition2(S, {call, _, simple_add, [Key, _Val, _Exp, _Flags]} = _C, R) ->
-    Vs = orddict:fetch(Key, S#state.dict),
+postcondition2(S, {call, _, simple_add, [Key, _Val, _Exp, _Flags, _Attribs]} = _C, R) ->
+    BinKey = to_binary(Key),
+    Vs = orddict:fetch(BinKey, S#state.values),
     case R of
         %%      %% For brick txn semantics
         %%      {txn_fail, [{_, {key_exists, _TS}}]} ->
         %%          Vs /= [];
         {key_exists, _TS} ->
             has_one_definite_or_maybe_val(Vs);
-        ok ->
+        {ok, _TS} ->
             has_zero_definite_vals(Vs)
     end;
-postcondition2(S, {call, _, simple_replace, [Key, _Val, _Exp, _Flags]} = _C, R) ->
-    Vs = orddict:fetch(Key, S#state.dict),
+postcondition2(S, {call, _, simple_replace, [Key, _Val, _Exp, _Flags, _Attribs]} = _C, R) ->
+    BinKey = to_binary(Key),
+    Vs = orddict:fetch(BinKey, S#state.values),
     case R of
         %%      %% For brick txn semantics
         %%      {txn_fail, [{_, key_not_exist}]} ->
         %%          Vs == [];
         key_not_exist ->
             has_zero_definite_vals(Vs);
-        ok ->
+        {ok, _TS} ->
             has_one_definite_or_maybe_val(Vs)
     end;
+postcondition2(S, {call, _, simple_rename, [OldKey, NewKey, _Exp, _Flags, _Attribs]} = _C, R) ->
+    BinOldKey = to_binary(OldKey),
+    OldVs = orddict:fetch(BinOldKey, S#state.values),
+    case R of
+        key_not_exist ->
+            BinOldKey =:= to_binary(NewKey) orelse has_zero_definite_vals(OldVs);
+        {ok, _TS} ->
+            has_one_definite_or_maybe_val(OldVs)
+    end;
 postcondition2(S, {call, _, simple_get, [Key, Flags]} = _C, R) ->
-    Vs = orddict:fetch(Key, S#state.dict),
+    BinKey = to_binary(Key),
+    Vs = orddict:fetch(BinKey, S#state.values),
     case R of
         key_not_exist ->
             has_zero_definite_vals(Vs);
         {ok, _TS, Val} ->
-            proplists:get_value(get_all_attribs, Flags) == undefined
+            proplists:get_value(get_all_attribs, Flags) =:= undefined
                 andalso val_is_a_definite_or_maybe(Val, Vs);
         %% with get_all_attribs flag
-        {ok, _TS, Val, _ExpTime, _Flags} ->
-            proplists:get_value(get_all_attribs, Flags) /= undefined
-                andalso val_is_a_definite_or_maybe(Val, Vs);
+        {ok, _TS, Val, ExpTime, Attributes} ->
+            proplists:get_value(get_all_attribs, Flags) =/= undefined
+                andalso val_is_a_definite_or_maybe(Val, Vs)
+                andalso check_exp_time(BinKey, ExpTime, S)
+                andalso check_attributes(BinKey, Attributes, S);
         {'EXIT', {timeout, _}} ->
             true                               % Hibari temp hack?
     end;
 postcondition2(S, {call, _, simple_delete, [Key]} = _C, R) ->
-    Vs = orddict:fetch(Key, S#state.dict),
+    BinKey = to_binary(Key),
+    Vs = orddict:fetch(BinKey, S#state.values),
     case R of
         %%      %% For brick txn semantics
         %%      {txn_fail, [{_, key_not_exist}]} ->
@@ -310,8 +422,8 @@ postcondition2(S, {call, _, simple_delete, [Key]} = _C, R) ->
             has_one_definite_or_maybe_val(Vs)
     end;
 postcondition2(S, {call, _, simple_get_many, [Key, MaxNum]} = _C, R) ->
-    AllKeys0 = [K || {K, V} <- orddict:to_list(S#state.dict),
-                     K > Key, V /= []],
+    AllKeys0 = [to_binary(K) || {K, V} <- orddict:to_list(S#state.values),
+                                K > Key, V /= []],
     {AllKeys, Rest} = lists:split(if MaxNum > length(AllKeys0) ->
                                           length(AllKeys0);
                                      true ->
@@ -319,14 +431,13 @@ postcondition2(S, {call, _, simple_get_many, [Key, MaxNum]} = _C, R) ->
                                   end, AllKeys0),
     case R of
         {ok, {Rs, Bool}} ->
-            RsKs = [K || {K, _TS} <- Rs],
+            RsKs = [to_binary(K) || {K, _TS} <- Rs],
             %% Since we don't know what's beyond the end of our limited range,
             %% we can't test the correctness of Bool 100% completely.
-            RsKs == AllKeys andalso
-                              ((MaxNum == 0 andalso Bool == true) orelse
-                                                                    (Bool == true andalso Rest /= []) orelse
-                                                                                                        (Bool == false andalso AllKeys == []) orelse
-                               true);
+            RsKs == AllKeys
+                andalso ((MaxNum == 0 andalso Bool == true)
+                         orelse (Bool == true andalso Rest /= [])
+                         orelse (Bool == false andalso AllKeys == []));
         _ ->
             false
     end;
@@ -356,9 +467,8 @@ postcondition2(_S, {call, _, crash_brick, _}, _R) ->
 postcondition2(_S, _Call, _R) ->
     false.
 
-%% next_state(S::symbolic_state(),R::var(),C::call()) :: symbolic_state()
 %% Called in symbolic & runtime context.
-
+-spec next_state(S::symbolic_state(), R::term(), C::qc_command()) -> symbolic_state().
 next_state(S, {var, _}, _C) ->
     %% BEWARE, this is big, big-time QuickCheck cheating.  It will
     %% really screw up QC's shrinking, but I'm more interested in
@@ -369,46 +479,89 @@ next_state(S, R, C) ->
     NewS = next_state2(S, R, C),
     NewS#state{step = S#state.step + 1}.
 
-next_state2(S, Result, {call, _, simple_set, [Key, Val, _Exp, _Flags]}) ->
-    Old = orddict:fetch(Key, S#state.dict),
-    New = case Result of ok          -> [Val];
-              {'EXIT', _} -> [{maybe_set, Val}|Old]
-          end,
-    S#state{dict = orddict:store(Key, New, S#state.dict)};
-
-next_state2(S, {key_exists, _TS}, {call, _, simple_add, [_Key, _Val, _Exp, _Flags]}) ->
+-spec next_state2(S::symbolic_state(), R::term(), C::qc_command()) -> symbolic_state().
+next_state2(S, Result, {call, _, simple_set, [Key, Val, Exp, Flags, Attribs]}) ->
+    BinKey = to_binary(Key),
+    OldExp = orddict:fetch(BinKey, S#state.exp_times),
+    OldAttribs = orddict:fetch(BinKey, S#state.attributes),
+    OldVal = orddict:fetch(BinKey, S#state.values),
+    NewVal = case Result of {ok, _TS} -> [Val];
+                 {'EXIT', _} -> [{maybe_set, Val}|OldVal]
+             end,
+    S#state{values =
+                orddict:store(BinKey, NewVal, S#state.values),
+            exp_times =
+                orddict:store(BinKey,
+                              apply_exp_time_directive(Flags, Exp, OldExp, replace),
+                              S#state.exp_times),
+            attributes =
+                orddict:store(BinKey,
+                              apply_attrib_directive(Flags, Attribs, OldAttribs, replace),
+                              S#state.attributes) };
+next_state2(S, {key_exists, _TS}, {call, _, simple_add, [_Key, _Val, _Exp, _Flags, _Attribs]}) ->
     %% TODO: If QuickCheck had control over the timestamps that we send,
     %%       then we would be able to use _TS to shrink the history list
-    %%       in the #state.dict.
+    %%       in the #state.values.
     S;
-next_state2(S, Result, {call, _, simple_add, [Key, Val, _Exp, _Flags]}) ->
-    next_state2(S, Result, {call, ?MODULE, simple_set, [Key, Val, _Exp, _Flags]});
-
-next_state2(S, key_not_exist, {call, _, simple_replace, [_Key, _Val, _Exp, _Flags]}) ->
+next_state2(S, Result, {call, _, simple_add, [Key, Val, _Exp, _Flags, _Attribs]}) ->
+    next_state2(S, Result, {call, ?MODULE, simple_set, [Key, Val, _Exp, _Flags, _Attribs]});
+next_state2(S, key_not_exist, {call, _, simple_replace, [_Key, _Val, _Exp, _Flags, _Attribs]}) ->
     %% TODO: If QuickCheck had control over the timestamps that we send,
     %%       then we would be able to use _TS to shrink the history list
-    %%       in the #state.dict.
+    %%       in the #state.values.
     S;
-next_state2(S, Result, {call, _, simple_replace, [Key, Val, _Exp, _Flags]}) ->
-    next_state2(S, Result, {call, ?MODULE, simple_set, [Key, Val, _Exp, _Flags]});
-
+next_state2(S, Result, {call, _, simple_replace, [Key, Val, _Exp, _Flags, _Attribs]}) ->
+    next_state2(S, Result, {call, ?MODULE, simple_set, [Key, Val, _Exp, _Flags, _Attribs]});
+next_state2(S, key_not_exist, {call, _, simple_rename, [_OldKey, _NewKey, _Exp, _Flags, _Attribs]}) ->
+    %% TODO: If QuickCheck had control over the timestamps that we send,
+    %%       then we would be able to use _TS to shrink the history list
+    %%       in the #state.values.
+    S;
+next_state2(S, Result, {call, _, simple_rename, [OldKey, NewKey, Exp, Flags, Attribs]}) ->
+    case Result of
+        {ok, _TS} ->
+            BinOldKey = to_binary(OldKey),
+            BinNewKey = to_binary(NewKey),
+            OldExp = orddict:fetch(BinOldKey, S#state.exp_times),
+            OldAttribs = orddict:fetch(BinOldKey, S#state.attributes),
+            Vals = orddict:fetch(BinOldKey, S#state.values),
+            S2 = S#state{values =
+                             orddict:store(BinNewKey, [hd(Vals)], S#state.values),
+                         exp_times =
+                             orddict:store(BinNewKey,
+                                           apply_exp_time_directive(Flags, Exp, OldExp, keep),
+                                           S#state.exp_times),
+                         attributes =
+                             orddict:store(BinNewKey,
+                                           apply_attrib_directive(Flags, Attribs, OldAttribs, keep),
+                                           S#state.attributes) },
+            next_state2(S2, ok, {call, ?MODULE, simple_delete, [BinOldKey]});
+        {'EXIT', _} ->
+            S
+    end;
 next_state2(S, Result, {call, _, simple_get, [Key, _Flags]}) ->
-    Old = orddict:fetch(Key, S#state.dict),
-    New = case Result of key_not_exist                 -> [];
+    BinKey = to_binary(Key),
+    Old = orddict:fetch(BinKey, S#state.values),
+    New = case Result of
+              key_not_exist                 -> [];
               {ok, _TS, Val}                -> [Val];
               {ok, _TS, Val, _ExpTime, _Fs} -> [Val];
               {'EXIT', _}                   -> Old
           end,
-    S#state{dict = orddict:store(Key, New, S#state.dict)};
-
+    S#state{values = orddict:store(BinKey, New, S#state.values)};
 next_state2(S, Result, {call, _, simple_delete, [Key]}) ->
-    Old = orddict:fetch(Key, S#state.dict),
+    BinKey = to_binary(Key),
+    Old = orddict:fetch(BinKey, S#state.values),
     New = case Result of key_not_exist -> [];
               ok            -> [];
               {'EXIT', _}   -> [maybe_delete|Old]
           end,
-    S#state{dict = orddict:store(Key, New, S#state.dict)};
-
+    S#state{exp_times =
+                orddict:store(BinKey, undefined, S#state.exp_times),
+            values =
+                orddict:store(BinKey, New, S#state.values),
+            attributes =
+                orddict:store(BinKey, undefined, S#state.attributes)};
 next_state2(S, FailedResult, {call, _, simple_do, [CrudeOps, _]} = C)
   when is_tuple(FailedResult) ->
     %% Make N copies of FailedResult and try again.
@@ -430,7 +583,6 @@ next_state2(S, ResList, {call, _, simple_do, [CrudeOps, _]}) ->
                         S2 = next_state2(St, Res, {call, ?MODULE, Name, Args}),
                         S2
                 end, S, CrudeRes);
-
 next_state2(S, _Result, {call, _, trigger_checkpoint, _}) ->
     S;
 next_state2(S, _Result, {call, _, set_do_sync, _}) ->
@@ -444,35 +596,134 @@ next_state2(S, _Result, {call, _, crash_brick, _}) ->
 next_state2(S, _Result, _Call) ->
     S.
 
+-spec invariant(#state{}) -> boolean().
+invariant(_S) ->
+    true.
+
+-spec aggregate([{integer(), term(), term(), #state{}}])
+               -> [{atom(), integer(), term()}].
+aggregate(L) ->
+    [ {Cmd,length(Args),filter_reply(Reply)} || {_N,{set,_,{call,_,Cmd,Args}},Reply,_State} <- L ].
+
+filter_reply({'EXIT',{Err,_}}) ->
+    {error,Err};
+filter_reply(_) ->
+    ok.
+
+-spec random_key() -> iolist() | string() | binary().
 random_key() ->
     ?LET(I, choose(1, ?MAX_KEYS),
          make_key(I)).
 
+-spec make_key(non_neg_integer()) -> key().
 make_key(I) ->
-    list_to_binary(io_lib:format("~s~4.4.0w", [key_prefix(), I])).
+    oneof([make_key_iolist(I),                 %% iolist()
+           lists:flatten(make_key_iolist(I)),  %% string()
+           list_to_binary(make_key_iolist(I))  %% binary()
+          ]).
 
+-spec make_key_iolist(non_neg_integer()) -> iolist().
+make_key_iolist(I) ->
+    io_lib:format("~s~4.4.0w", [key_prefix(), I]).
+
+-spec key_prefix() -> key().
 key_prefix() ->
     "/foo/bar/".
 
+-spec make_exp(state()) -> exp_time().
 make_exp(S) ->
     {MSec, Sec, USec} = now(),
     NowX = (MSec * 1000000 * 1000000) + (Sec * 1000000) + USec,
     (NowX * 1000) + S#state.step.
 
+-spec apply_exp_time_directive([op_flag()],
+                               NewExpTime::exp_time(), OldExpTime::exp_time(),
+                               Default:: keep | replace) -> exp_time().
+apply_exp_time_directive(_Flags, NewExpTime, undefined, _Default) ->
+    NewExpTime;
+apply_exp_time_directive(Flags, NewExpTime, OldExpTime, Default) ->
+    case proplists:get_value(exp_time_directive, Flags) of
+        undefined when Default =:= keep ->
+            OldExpTime;
+        undefined when Default =:= replace ->
+            NewExpTime;
+        keep ->
+            OldExpTime;
+        replace ->
+            NewExpTime
+    end.
+
+-spec apply_attrib_directive([op_flag()],
+                             NewAttribs::[attribute()], OldAttribs::[attribute()],
+                             Default:: keep | replace) -> [attribute()].
+apply_attrib_directive(_Flags, NewAttribs, undefined, _Default) ->
+    NewAttribs;
+apply_attrib_directive(Flags, NewAttribs, OldAttribs, Default) ->
+    case proplists:get_value(attrib_directive, Flags) of
+        undefined when Default =:= keep ->
+            apply_attrib_directive1(NewAttribs, OldAttribs);
+        undefined when Default =:= replace ->
+            NewAttribs;
+        keep ->
+            apply_attrib_directive1(NewAttribs, OldAttribs);
+        replace ->
+            NewAttribs
+    end.
+
+-spec apply_attrib_directive1(NewAttribs::[attribute()], OldAttribs::[attribute()]) ->
+                                     [attribute()].
+apply_attrib_directive1([], OldAttribs) ->
+    OldAttribs;
+apply_attrib_directive1(NewAttribs, []) ->
+    NewAttribs;
+apply_attrib_directive1(NewAttribs, OldAttribs) ->
+    F = fun({Key, _}=Attrib, Acc) ->
+                gb_trees:enter(Key, Attrib, Acc);
+           (Attrib, Acc) when is_atom(Attrib) ->
+                gb_trees:enter(Attrib, Attrib, Acc)
+        end,
+    MergedAttribs0 = lists:foldl(F, gb_trees:empty(), OldAttribs),
+    MergedAttribs1 = lists:foldl(F, MergedAttribs0, NewAttribs),
+    gb_trees:values(MergedAttribs1).
+
+-spec random_val() -> val().
+%% @TODO(tatsuya6502) Generate iolist and string. Check the val in postcondition.
 random_val() ->
     oneof([<<>>,
            ?LET({I, Char}, {nat(), choose($a, $z)},
                 list_to_binary(io_lib:format("v ~s",
                                              [lists:duplicate(I + 1, Char)])))]).
 
-simple_set(Key, Val, Exp, Flags) ->
-    catch brick_simple:set(?TABLE, Key, Val, Exp, Flags, 9000).
+-spec to_binary(binary() | string()) -> binary().
+to_binary(Bin) when is_binary(Bin) ->
+    Bin;
+to_binary(List) when is_list(List) ->
+    list_to_binary(List).
 
-simple_add(Key, Val, Exp, Flags) ->
-    catch brick_simple:add(?TABLE, Key, Val, Exp, Flags, 9000).
+-spec check_exp_time(key(), exp_time(), state()) -> boolean().
+check_exp_time(BinKey, Exp, #state{exp_times=ExpDict}) ->
+    ExpectedExp = orddict:fetch(BinKey, ExpDict),  %% can be undefined
+    Exp =:= ExpectedExp.
 
-simple_replace(Key, Val, Exp, Flags) ->
-    catch brick_simple:replace(?TABLE, Key, Val, Exp, Flags, 9000).
+-spec check_attributes(key(), [attribute()], state()) -> boolean().
+check_attributes(BinKey, Attributes, #state{attributes=AttribDict}) ->
+    SortedAttributes = lists:keysort(1, lists:keydelete(val_len, 1, Attributes)),
+    ExpectedAttributes = orddict:fetch(BinKey, AttribDict),
+    SortedAttributes =:= ExpectedAttributes.
+
+-spec simple_set(key(), val(), exp_time(), [op_flag()], [attribute()]) ->
+                        {ok, timestamp()} | {error, term()}.
+simple_set(Key, Val, Exp, Flags, Attribs) ->
+    catch brick_simple:set(?TABLE, Key, Val, Exp, Flags ++ Attribs, 9000).
+
+simple_add(Key, Val, Exp, Flags, Attribs) ->
+    catch brick_simple:add(?TABLE, Key, Val, Exp, Flags ++ Attribs, 9000).
+
+simple_replace(Key, Val, Exp, Flags, Attribs) ->
+    catch brick_simple:replace(?TABLE, Key, Val, Exp, Flags ++ Attribs, 9000).
+
+simple_rename(OldKey, NewKey, Exp, Flags, Attribs) ->
+    catch brick_simple:rename(?TABLE, OldKey, NewKey, Exp, Flags ++ Attribs, 9000).
 
 simple_get(Key, Flags) ->
     %% Use much smaller timeout here: if we timeout, no huge deal.
@@ -484,12 +735,14 @@ simple_delete(Key) ->
 
 simple_do(CrudeOps, DoFlags) ->
     DoList = lists:map(
-               fun({simple_set, [K, V, Exp, Flags]}) ->
-                       brick_server:make_set(K, V, Exp, Flags);
-                  ({simple_add, [K, V, Exp, Flags]}) ->
-                       brick_server:make_add(K, V, Exp, Flags);
-                  ({simple_replace, [K, V, Exp, Flags]}) ->
-                       brick_server:make_replace(K, V, Exp, Flags);
+               fun({simple_set, [K, V, Exp, Flags, Attribs]}) ->
+                       brick_server:make_set(K, V, Exp, Flags ++ Attribs);
+                  ({simple_add, [K, V, Exp, Flags, Attribs]}) ->
+                       brick_server:make_add(K, V, Exp, Flags ++ Attribs);
+                  ({simple_replace, [K, V, Exp, Flags, Attribs]}) ->
+                       brick_server:make_replace(K, V, Exp, Flags ++ Attribs);
+                  ({simple_rename, [OldK, NewK, Exp, Flags, Attribs]}) ->
+                       brick_server:make_rename(OldK, NewK, Exp, Flags ++ Attribs);
                   ({simple_get, [K, Flags]}) ->
                        brick_server:make_get(K, Flags);
                   ({simple_delete, [K]}) ->
@@ -503,6 +756,7 @@ simple_get_many(Key, MaxNum) ->
                                  {binary_prefix, list_to_binary(key_prefix())}]).
 
 is_ok(ok)                      -> true;
+is_ok({ok, _TS})               -> true;
 is_ok({'EXIT', {shutdown, _}}) -> true;
 is_ok({'EXIT', {noproc, _}})   -> true;         % Would be false in ideal world
 is_ok({'EXIT', {timeout, _}})  -> false;        % Is false in an ideal world
@@ -519,7 +773,7 @@ expect_equal(Tag, Got, Expected) ->
     exit({Tag, got, Got, expected, Expected}).
 
 calc_state_usage(S) ->
-    Hs = orddict:to_list(S#state.dict),
+    Hs = orddict:to_list(S#state.values),
     lists:foldl(
       fun({_K, []}, Acc) ->
               Acc;
@@ -530,7 +784,7 @@ calc_state_usage(S) ->
 calc_actual_usage(QRoot) ->
     {ok, {All, false}} = brick_simple:get_many(?TABLE, QRoot, ?MAX_KEYS+70,
                                                [{binary_prefix, QRoot}]),
-    Vals = [V || {_K, _TS, V, _Exp, _Fs} <- All],
+    Vals = [V || {_K, _TS, V} <- All],
     Items = length(Vals),
     Bytes = lists:foldl(fun(X, Sum) -> size(X) + Sum end, 0, Vals),
     {Items, Bytes}.
@@ -561,6 +815,7 @@ all_do_list_are(DoList, Type) ->
 classify_do({simple_set, _})     -> write;
 classify_do({simple_add, _})     -> write;
 classify_do({simple_replace, _}) -> write;
+classify_do({simple_rename, _})  -> write;
 classify_do({simple_delete, _})  -> write;
 classify_do({simple_get, _})     -> read.
 
@@ -571,7 +826,7 @@ all_same_brick(List) ->
     X = [begin
              RdWr = classify_do(Do),
              Key = hd(element(2, Do)),
-             brick_simple:find_the_brick(?TABLE, Key, RdWr)
+             brick_simple_client:find_the_brick(?TABLE, Key, RdWr)
          end || Do <- List],
     length(X) == 1.
 
@@ -610,9 +865,12 @@ ets_table_sizes_match_p(S) ->
              end, 0).
 
 ets_table_sizes_match_p2(_AorB, _S) ->
-    L11s = (catch [Exp || {_, _, _, _, Exp} <- ets:tab2list(tab1_ch1_b1_store)]),
+    GetExp = fun({_, _, _, _, Exp})    -> Exp;
+                ({_, _, _, _, Exp, _}) -> Exp
+             end,
+    L11s = (catch lists:map(GetExp, ets:tab2list(tab1_ch1_b1_store))),
     L11e = (catch ets:tab2list(tab1_ch1_b1_exp)),
-    L12s = (catch [Exp || {_, _, _, _, Exp} <- ets:tab2list(tab1_ch1_b2_store)]),
+    L12s = (catch lists:map(GetExp, ets:tab2list(tab1_ch1_b2_store))),
     L12e = (catch ets:tab2list(tab1_ch1_b2_exp)),
     Len11s = (catch length(L11s)),
     Len11e = (catch length(L11e)),
@@ -680,14 +938,14 @@ stopfile_exists() ->
         _       -> false
     end.
 
-wrap_with_stopfile(Num) when is_integer(Num) ->
-    wrap_with_stopfile(
-      fun() -> ?GMTQC:quickcheck(noshrink(numtests(Num, prop_simple1_noproc_ok()))) end);
-wrap_with_stopfile(Fun) when is_function(Fun) ->
-    file:write_file(stopfile(), <<>>),
-    Res = Fun(),
-    file:delete(stopfile()),
-    Res.
+%% wrap_with_stopfile(Num) when is_integer(Num) ->
+%%     wrap_with_stopfile(
+%%       fun() -> ?QC:quickcheck(noshrink(numtests(Num, prop_simple1_noproc_ok()))) end);
+%% wrap_with_stopfile(Fun) when is_function(Fun) ->
+%%     file:write_file(stopfile(), <<>>),
+%%     Res = Fun(),
+%%     file:delete(stopfile()),
+%%     Res.
 
 %% Assumes using tab1 and brick naming convention tab1_ch1_b1 and tab1_ch1_b2.
 change_chain_len_while_qc_running() ->
@@ -753,4 +1011,4 @@ change_num_chains(Tab) ->
     brick_admin:start_migration(Tab, LH,
                                 [{max_keys_per_iter, random:uniform(5)}]).
 
--endif. %% -ifdef(GMTQC).
+-endif. %% -ifdef(QC).

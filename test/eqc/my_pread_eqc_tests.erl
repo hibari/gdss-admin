@@ -1,5 +1,5 @@
 %%%----------------------------------------------------------------------
-%%% Copyright: (c) 2009-2013 Hibari developers.  All rights reserved.
+%%% Copyright (c) 2009-2015 Hibari developers.  All rights reserved.
 %%%
 %%% Licensed under the Apache License, Version 2.0 (the "License");
 %%% you may not use this file except in compliance with the License.
@@ -19,20 +19,10 @@
 
 -module(my_pread_eqc_tests).
 
--ifdef(PROPER).
--include_lib("proper/include/proper.hrl").
--define(GMTQC, proper).
--undef(EQC).
--endif. %% -ifdef(PROPER).
+-ifdef(QC).
 
--ifdef(EQC).
--include_lib("eqc/include/eqc.hrl").
--include_lib("eqc/include/eqc_statem.hrl").
--define(GMTQC, eqc).
--undef(PROPER).
--endif. %% -ifdef(EQC).
-
--ifdef(GMTQC).
+-eqc_group_commands(false).
+-include_lib("qc/include/qc_statem.hrl").
 
 -include_lib("kernel/include/file.hrl").
 
@@ -42,7 +32,7 @@ run() ->
     run(500).
 
 run(NumTests) ->
-    gmt_eqc:module({numtests,NumTests}, ?MODULE).
+    qc_statem:qc_run(?MODULE, NumTests, []).
 
 -record(state, {
           size_f1,
@@ -167,4 +157,4 @@ get_standard_fh(#state{cur_sym_fh = b} = S) -> S#state.standard_fh2.
 get_size(#state{cur_sym_fh = a} = S) -> S#state.size_f1;
 get_size(#state{cur_sym_fh = b} = S) -> S#state.size_f2.
 
--endif. %% -ifdef(GMTQC).
+-endif. %% -ifdef(QC).

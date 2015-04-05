@@ -1,5 +1,5 @@
 %%%----------------------------------------------------------------------
-%%% Copyright: (c) 2009-2013 Hibari developers.  All rights reserved.
+%%% Copyright (c) 2009-2015 Hibari developers.  All rights reserved.
 %%%
 %%% Licensed under the Apache License, Version 2.0 (the "License");
 %%% you may not use this file except in compliance with the License.
@@ -19,20 +19,10 @@
 
 -module(hlog_eqc_tests).
 
--ifdef(PROPER).
--include_lib("proper/include/proper.hrl").
--define(GMTQC, proper).
--undef(EQC).
--endif. %% -ifdef(PROPER).
+-ifdef(QC).
 
--ifdef(EQC).
--include_lib("eqc/include/eqc.hrl").
--include_lib("eqc/include/eqc_statem.hrl").
--define(GMTQC, eqc).
--undef(PROPER).
--endif. %% -ifdef(EQC).
-
--ifdef(GMTQC).
+-eqc_group_commands(false).
+-include_lib("qc/include/qc_statem.hrl").
 
 -include("gmt_hlog.hrl").
 -include_lib("kernel/include/file.hrl").
@@ -59,12 +49,15 @@ run() ->
     run(500).
 
 run(NumTests) ->
-    gmt_eqc:module({numtests,NumTests}, ?MODULE).
+    qc_statem:qc_run(?MODULE, NumTests, []).
 
 prop_log() ->
     prop_log(false).
 
 prop_log(EnableScribbleTestP) ->
+    %% This will initialize app env 'brick_default_data_dir'
+    _ = application:load(gdss_brick),
+
     io:format("\nNOTE: Failure due to 'hunk_header_too_big' exception\n"
               "is not a real failure and can be ignored safely.\n\n"),
     %%timer:sleep(1000),
@@ -495,4 +488,4 @@ do_scribbles(ArgsList, PathT) ->
 %% Pread "./zzz-hlog-qc/000000000005.HLOG" at Pos 32 for 23 bytes
 %% Use Scribble <<"©©©©©©©©©©©©©©©©©©©©©©©">> at "./zzz-hlog-qc/000000000005.HLOG" Pos 32
 
--endif. %% -ifdef(GMTQC).
+-endif. %% -ifdef(QC).

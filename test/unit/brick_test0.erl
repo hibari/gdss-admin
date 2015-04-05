@@ -1,5 +1,5 @@
 %%%----------------------------------------------------------------------
-%%% Copyright (c) 2009-2013 Hibari developers.  All rights reserved.
+%%% Copyright (c) 2009-2015 Hibari developers.  All rights reserved.
 %%%
 %%% Licensed under the Apache License, Version 2.0 (the "License");
 %%% you may not use this file except in compliance with the License.
@@ -19,18 +19,10 @@
 
 -module(brick_test0).
 
--ifdef(PROPER).
--include_lib("proper/include/proper.hrl").
--define(GMTQC, proper).
--undef(EQC).
--endif. %% -ifdef(PROPER).
-
--ifdef(EQC).
--include_lib("eqc/include/eqc.hrl").
--include_lib("eqc/include/eqc_statem.hrl").
--define(GMTQC, eqc).
--undef(PROPER).
--endif. %% -ifdef(EQC).
+-ifdef(QC).
+-eqc_group_commands(false).
+-include_lib("qc/include/qc_statem.hrl").
+-endif. %% -ifdef(QC).
 
 -include("brick.hrl").
 -include("brick_admin.hrl").
@@ -206,16 +198,16 @@ t1(BrickName, Node) ->
 
     %% Test basic add, replace, set
 
-    ok = ?M:set(BrickName, Node, "foo", "foo2"),
+    {ok, _} = ?M:set(BrickName, Node, "foo", "foo2"),
     %%S1 = ?M:dump_state(Node),
     %%io:format("State 1 = ~w\n", [S1]),
     {key_exists, _} = ?M:add(BrickName, Node, "foo", "foo2"),
 
     key_not_exist = ?M:replace(BrickName, Node, "notexist", "foo2"),
-    ok = ?M:replace(BrickName, Node, "foo", "foo22"),
+    {ok, _} = ?M:replace(BrickName, Node, "foo", "foo22"),
 
-    ok = ?M:set(BrickName, Node, "foo", "foo222"),
-    ok = ?M:set(BrickName, Node, "bar", "bar2"),
+    {ok, _} = ?M:set(BrickName, Node, "foo", "foo222"),
+    {ok, _} = ?M:set(BrickName, Node, "bar", "bar2"),
 
     %% Test basic get
     {ok, TS0, <<"foo222">>} = ?M:get(BrickName, Node, "foo"),
@@ -226,19 +218,19 @@ t1(BrickName, Node) ->
     key_not_exist = ?M:get(BrickName, Node, "fooA", [witness]),
 
     %% Test basic replace, set with test-and-set flag
-    ok = ?M:replace(BrickName, Node, "foo", "foo2222", [{testset, TS0}]),
+    {ok, _} = ?M:replace(BrickName, Node, "foo", "foo2222", [{testset, TS0}]),
     {ts_error, _} = ?M:replace(BrickName, Node, "foo", "foo666", [{testset, TS0 + 1}]),
-    ok = ?M:replace(BrickName, Node, "bar", "bar22", [{testset, TS1}]),
+    {ok, _} = ?M:replace(BrickName, Node, "bar", "bar22", [{testset, TS1}]),
     {ts_error, _} = ?M:replace(BrickName, Node, "bar", "bar666", [{testset, TS1 + 1}]),
 
     %% Basic add with test-and-set flag
-    ok = ?M:add(BrickName, Node, "baz", "baz2", [{testset, 42}]),
+    {ok, _} = ?M:add(BrickName, Node, "baz", "baz2", [{testset, 42}]),
     {ok, TS2} = ?M:get(BrickName, Node, "baz", [witness]),
     {key_exists, TS2} = ?M:add(BrickName, Node, "baz", "baz666", [{testset, TS2}]),
     {ts_error, TS2} = ?M:add(BrickName, Node, "baz", "baz22", [{testset, TS2 - 1}]),
 
     %% Basic set with test-and-set flag
-    ok = ?M:set(BrickName, Node, "baz", <<"baz3">>, [{testset, TS2}]),
+    {ok, _} = ?M:set(BrickName, Node, "baz", <<"baz3">>, [{testset, TS2}]),
     {ts_error, TS3} = ?M:set(BrickName, Node, "baz", <<"baz4">>, [{testset, TS2}]),
     %% Timestamp TS3 is correct for test-and-set, but this set is
     %% using TS3 again for the new timestamp, and the new & different
@@ -253,19 +245,19 @@ t1(BrickName, Node) ->
                               [{testset, TS3}])]),
 
     %% Basic delete
-    ok = ?M:add(BrickName, Node, "delme", "delme1"),
+    {ok, _} = ?M:add(BrickName, Node, "delme", "delme1"),
     {ok, TSD1, <<"delme1">>} = ?M:get(BrickName, Node, "delme"),
     key_not_exist = ?M:delete(BrickName, Node, "delmefoo"),
     {ts_error, TSD1} = ?M:delete(BrickName, Node, "delme", [{testset, TSD1 + 1}]),
     ok = ?M:delete(BrickName, Node, "delme", [{testset, TSD1}]),
     key_not_exist = ?M:delete(BrickName, Node, "delme", [{testset, TSD1}]),
-    ok = ?M:add(BrickName, Node, "delme-again", "delme-again1"),
+    {ok, _} = ?M:add(BrickName, Node, "delme-again", "delme-again1"),
     {ok, _TSD2, <<"delme-again1">>} = ?M:get(BrickName, Node, "delme-again"),
     ok = ?M:delete(BrickName, Node, "delme-again"),
     key_not_exist = ?M:delete(BrickName, Node, "delme-again"),
 
     %% Basic multiple queries
-    [ok, ok, {key_exists, _}] =
+    [{ok, _}, {ok, _}, {key_exists, _}] =
         ?M:do(BrickName, Node, [?M:make_add("m-a1a", "m-a1a-v"),
                                 ?M:make_add("m-a1b", "m-a1b-v"),
                                 ?M:make_add("foo", "foo66")]),
@@ -277,7 +269,7 @@ t1(BrickName, Node) ->
                                 ?M:make_add("m-a1c", "m-a1c-v"),
                                 ?M:make_add("m-a1d", "m-a1d-v"),
                                 ?M:make_add("foo", "foo66")]),
-    [ok, ok, {ok, _, _}, ok]  =
+    [{ok, _}, {ok, _}, {ok, _, _}, {ok, _}]  =
         ?M:do(BrickName, Node, [?M:make_txn(),
                                 ?M:make_add("m-a1c", "m-a1c-v"),
                                 ?M:make_add("m-a1d", "m-a1d-v"),
@@ -289,9 +281,9 @@ t1(BrickName, Node) ->
     %% try to replace/set it with a timestamp that's older than
     %% what is already there.
 
-    ok = ?M:set(BrickName, Node, "age-key", <<"age-value">>),
-    ok = ?M:set(BrickName, Node, "age-key", <<"age-value2">>),
-    ok = ?M:replace(BrickName, Node, "age-key", <<"age-value-good">>),
+    {ok, _} = ?M:set(BrickName, Node, "age-key", <<"age-value">>),
+    {ok, _} = ?M:set(BrickName, Node, "age-key", <<"age-value2">>),
+    {ok, _} = ?M:replace(BrickName, Node, "age-key", <<"age-value-good">>),
     TooOldTS = 42,                              % 42 usecs after 01/01/1970
     OpListSet1 = [?M:make_op6(set, "age-key", TooOldTS,
                               <<"age-value4">>, 0, [])],
@@ -359,9 +351,9 @@ t2(BrickName, Node) ->
     %% Add a key that we know will be at the end of the list.
     ManyRes3Len = length(ManyRes3),
     [] = lists:nthtail(ManyRes3Len, ManyRes3),
-    ok = ?M:set(BrickName, Node, "zzz1", "zzz1-value"),
+    {ok, _} = ?M:set(BrickName, Node, "zzz1", "zzz1-value"),
     {ok, {ManyRes4, false}} = ?M:get_many(BrickName, Node, ?BRICK__GET_MANY_FIRST, 1111),
-    [{<<"zzz1">>, _, <<"zzz1-value">>, 0, [{val_len, 10}]}] = lists:nthtail(ManyRes3Len, ManyRes4),
+    [{<<"zzz1">>, _, <<"zzz1-value">>}] = lists:nthtail(ManyRes3Len, ManyRes4),
 
     %% Check the same thing as ManyRes4, but with different flags:
     %% witness and witness+get_all_attribs.
@@ -382,16 +374,16 @@ t3(BrickName, Node) ->
 
     %% Delete all entries in the table.
     {ok, {ManyRes1, false}} = ?M:get_many(BrickName, Node, ?BRICK__GET_MANY_FIRST, 1111),
-    [ok = ?M:delete(BrickName, Node, Key) || {Key, _, _, _, _} <- ManyRes1],
+    [ok = ?M:delete(BrickName, Node, Key) || {Key, _, _} <- ManyRes1],
     {ok, {[], false}} = ?M:get_many(BrickName, Node, ?BRICK__GET_MANY_FIRST, 1111),
 
     Fbin = fun(L) -> [list_to_binary(X) || X <- L] end,
 
     %% Populate the table
     ManyPopKeys = Fbin(["15", "16", "17", "30", "31", "32", "55", "56", "57"]),
-    [ok = ?M:set(BrickName, Node, Key, Key) || Key <- ManyPopKeys],
+    [{ok, _} = ?M:set(BrickName, Node, Key, Key) || Key <- ManyPopKeys],
     {ok, {ManyRes2, false}} = ?M:get_many(BrickName, Node, ?BRICK__GET_MANY_FIRST, 1111),
-    ManyRes2Keys = [Key || {Key, _, _, _, _} <- ManyRes2],
+    ManyRes2Keys = [Key || {Key, _, _} <- ManyRes2],
     ManyPopKeys = ManyRes2Keys,
 
     %% Start a checkpoint
@@ -400,22 +392,22 @@ t3(BrickName, Node) ->
 
     %% Modify the table to create enough cases where
     %% we put brick_server:get_many_merge() through all of its cases.
-    ok = ?M:set(BrickName, Node, "50", "50"),
+    {ok, _} = ?M:set(BrickName, Node, "50", "50"),
     ok = ?M:delete(BrickName, Node, "32"),
     {ok, {ManyRes3, false}} = ?M:get_many(BrickName, Node, ?BRICK__GET_MANY_FIRST, 1111),
-    ManyRes3Keys = [Key || {Key, _, _, _, _} <- ManyRes3],
+    ManyRes3Keys = [Key || {Key, _, _} <- ManyRes3],
     ManyRes3Keys = Fbin(["15", "16", "17", "30", "31", "50", "55", "56", "57"]),
 
     ok = ?M:delete(BrickName, Node, "30"),
-    ok = ?M:set(BrickName, Node, "32", "32-new"),
+    {ok, _} = ?M:set(BrickName, Node, "32", "32-new"),
     {ok, {ManyRes4, false}} = ?M:get_many(BrickName, Node, ?BRICK__GET_MANY_FIRST, 1111),
-    ManyRes4Keys = [Key || {Key, _, _, _, _} <- ManyRes4],
+    ManyRes4Keys = [Key || {Key, _, _} <- ManyRes4],
     ManyRes4Keys = Fbin(["15", "16", "17", "31", "32", "50", "55", "56", "57"]),
 
     ok = ?M:delete(BrickName, Node, "57"),
-    ok = ?M:set(BrickName, Node, "60", "60"),
+    {ok, _} = ?M:set(BrickName, Node, "60", "60"),
     {ok, {ManyRes5, false}} = ?M:get_many(BrickName, Node, ?BRICK__GET_MANY_FIRST, 1111),
-    ManyRes5Keys = [Key || {Key, _, _, _, _} <- ManyRes5],
+    ManyRes5Keys = [Key || {Key, _, _} <- ManyRes5],
     ManyRes5Keys = Fbin(["15", "16", "17", "31", "32", "50", "55", "56", "60"]),
 
     %% Verify that we're still in the middle of our checkpoint.
@@ -431,7 +423,7 @@ t3(BrickName, Node) ->
 
     %% Now that checkpoint is done, verify key list is the same as Res5.
     {ok, {ManyRes6, false}} = ?M:get_many(BrickName, Node, ?BRICK__GET_MANY_FIRST, 1111),
-    ManyRes6Keys = [Key || {Key, _, _, _, _} <- ManyRes6],
+    ManyRes6Keys = [Key || {Key, _, _} <- ManyRes6],
     io:format("ManyRes5Keys = ~p\n", [ManyRes5Keys]),
     io:format("ManyRes6Keys = ~p\n", [ManyRes6Keys]),
     ManyRes6Keys = ManyRes5Keys,
@@ -439,15 +431,15 @@ t3(BrickName, Node) ->
     %% Delete all entries again, populate a few from scratch, checkpoint.
     [ok = ?M:delete(BrickName, Node, Key) || {Key, _, _, _, _} <- ManyRes6],
     {ok, {[], false}} = ?M:get_many(BrickName, Node, ?BRICK__GET_MANY_FIRST, 1111),
-    [ok = ?M:set(BrickName, Node, Key, Key) || Key <- ManyPopKeys],
+    [{ok, _} = ?M:set(BrickName, Node, Key, Key) || Key <- ManyPopKeys],
     brick_server:checkpoint(BrickName, Node, [{start_sleep_time,1000}]),
     timer:sleep(200),
 
     %% Try to hit clause 3 of get_many_merge
-    [ok = ?M:set(BrickName, Node, Key, Key) || Key <- ManyPopKeys],
-    ok = ?M:set(BrickName, Node, "99", "99"),
+    [{ok, _} = ?M:set(BrickName, Node, Key, Key) || Key <- ManyPopKeys],
+    {ok, _} = ?M:set(BrickName, Node, "99", "99"),
     {ok, {ManyRes7, false}} = ?M:get_many(BrickName, Node, ?BRICK__GET_MANY_FIRST, 1111),
-    ManyRes7Keys = [Key || {Key, _, _, _, _} <- ManyRes7],
+    ManyRes7Keys = [Key || {Key, _, _} <- ManyRes7],
     ManyRes7Keys = ManyPopKeys ++ Fbin(["99"]),
 
     %% Verify that we're still in the middle of our checkpoint.
@@ -481,7 +473,7 @@ t4(BrickName, Node) ->
     %% Delete all entries in the table.
     {ok, {_ManyRes1a, false}} = ?M:get_many(BrickName, Node, ?BRICK__GET_MANY_FIRST, 1111, [witness]),
     {ok, {ManyRes1, false}} = ?M:get_many(BrickName, Node, ?BRICK__GET_MANY_FIRST, 1111),
-    [ok = ?M:delete(BrickName, Node, Key) || {Key, _, _, _, _} <- ManyRes1],
+    [ok = ?M:delete(BrickName, Node, Key) || {Key, _, _} <- ManyRes1],
     {ok, {[], false}} = ?M:get_many(BrickName, Node, ?BRICK__GET_MANY_FIRST, 1111),
     {ok, {[], false}} =
         ?M:get_many(BrickName, Node, ?BRICK__GET_MANY_FIRST, 1111, P1),
@@ -494,7 +486,7 @@ t4(BrickName, Node) ->
     ManyPopKeys =
         [list_to_binary(X) ||
             X <- ["15", "16", "17", "30", "31", "32", "55", "56", "57"]],
-    [ok = ?M:set(BrickName, Node, Key, Key) || Key <- ManyPopKeys],
+    [{ok, _} = ?M:set(BrickName, Node, Key, Key) || Key <- ManyPopKeys],
 
     {ok, {[], false}} =
         ?M:get_many(BrickName, Node, <<"0">>, 1111, P0),
@@ -535,7 +527,7 @@ t5(BrickName, Node) ->
     Key1  = <<"contended-key1">>,
     Val1a = <<"Whatever, man">>,
     Val1b = <<"Dude, it's time for something slightly newer.">>,
-    ok = ?M:set(BrickName, Node, Key1, Val1a),
+    {ok, _} = ?M:set(BrickName, Node, Key1, Val1a),
 
     [ok = t5_helper(BrickName, Node, Key1, Val1b, 40, 60) ||
         _ <- lists:seq(1, 20)],
@@ -605,12 +597,12 @@ t7(BrickName, Node) ->
 
     %% Test add vs set vs replace
     Do10 = [?M:make_txn(), ?M:make_add("t1", "v1")],
-    [ok] = ?M:do(BrickName, Node, Do10),
+    [{ok, _}] = ?M:do(BrickName, Node, Do10),
     {txn_fail, [{1, {key_exists, _}}]} = ?M:do(BrickName, Node, Do10),
     Do11 = [?M:make_txn(), ?M:make_replace("t1", "v1")],
-    [ok] = ?M:do(BrickName, Node, Do11),
+    [{ok, _}] = ?M:do(BrickName, Node, Do11),
     Do12 = [?M:make_txn(), ?M:make_set("t1", "v1")],
-    [ok] = ?M:do(BrickName, Node, Do12),
+    [{ok, _}] = ?M:do(BrickName, Node, Do12),
 
     %% Test must_not_exist
     Do20 = [?M:make_txn(), ?M:make_get("t1", [must_not_exist])],
@@ -623,7 +615,7 @@ t7(BrickName, Node) ->
 
     %% ssf testing
 
-    [ok = ?M:set(BrickName, Node, list_to_binary(K), list_to_binary(V)) ||
+    [{ok, _} = ?M:set(BrickName, Node, list_to_binary(K), list_to_binary(V)) ||
         {K, V} <- [{"t1", "v1"}, {"t2", "v2"}, {"t3", "v3"}, {"t4", "v4"}]],
     Fget1 = fun(Key, _DoOp, _DoFlags, S) ->
                     %% Also exercise the ssf_* helper funcs.
@@ -669,12 +661,12 @@ t8(BrickName, Node) ->
     %% was wrong (when using same expiry).  Also, latent bug when
     %% using different expiry values.
     Fdo = fun(Incr) ->
-                  ok = ?M:set(BrickName, Node, Key, <<>>, Exp, [], 5*1000),
-                  ok = ?M:set(BrickName, Node, Key, <<>>, Exp+(Incr*1), [], 5*1000),
+                  {ok, _} = ?M:set(BrickName, Node, Key, <<>>, Exp, [], 5*1000),
+                  {ok, _} = ?M:set(BrickName, Node, Key, <<>>, Exp+(Incr*1), [], 5*1000),
                   true = Ftest(),
-                  ok = ?M:replace(BrickName, Node, Key, <<>>, Exp+(Incr*2), [], 5*1000),
+                  {ok, _} = ?M:replace(BrickName, Node, Key, <<>>, Exp+(Incr*2), [], 5*1000),
                   true = Ftest(),
-                  ok = ?M:delete(BrickName, Node, Key),
+                  {ok, _} = ?M:delete(BrickName, Node, Key),
                   true = Ftest(),
                   ok
           end,
@@ -687,14 +679,14 @@ t8(BrickName, Node) ->
 t50(BrickName, Node, NumIters, DoSet) ->
     io:format("Test t50: start\n"),
 
-    ok = ?M:set(BrickName, Node, "t50-s1", "t50-s1-val"),
+    {ok, _} = ?M:set(BrickName, Node, "t50-s1", "t50-s1-val"),
     {key_exists, _} = ?M:add(BrickName, Node, "t50-s1", "t50-s1-val666"),
-    ok = ?M:replace(BrickName, Node, "t50-s1", "t50-s1-val2"),
+    {ok, _} = ?M:replace(BrickName, Node, "t50-s1", "t50-s1-val2"),
 
     Val2K = list_to_binary(lists:duplicate(2*1024, $x)),
     Set1 = fun(N) ->
                    K = lists:flatten(io_lib:format("t50-Fun1-~w-~w", [node(), N])),
-                   ok = ?M:set(BrickName, Node, K, Val2K)
+                   {ok, _} = ?M:set(BrickName, Node, K, Val2K)
            end,
     if DoSet == true ->
             io:format("\n"),
@@ -726,7 +718,7 @@ t50(BrickName, Node, NumIters, DoSet) ->
     %%                 Val4B = list_to_binary("foo" ++ atom_to_list(Node)),
     %%                 F1 = fun(N) ->
     %%                              K = lists:flatten(io_lib:format("t50-Fun1-~w-~w", [node(), N])),
-    %%                              [ok] = ?M:set([Node], BrickName, K, Val4B)
+    %%                              [{ok, _}] = ?M:set([Node], BrickName, K, Val4B)
     %%                      end,
     %%                 {T1a, _R} = timer:tc(?MODULE, loopN, [NumIters, F1]),
     %%                 io:format("done in ~w secs (~w op/sec)\n", [T1a / 1000000, NumIters / (T1a / 1000000)]),
@@ -749,9 +741,9 @@ t50(BrickName, Node, NumIters, DoSet) ->
 t51(BrickName, Node, NumProcs, PhaseTime, DoSet) ->
     io:format("Test t51: start\n"),
 
-    ok = ?M:set(BrickName, Node, "t50-s1", "t50-s1-val"),
+    {ok, _} = ?M:set(BrickName, Node, "t50-s1", "t50-s1-val"),
     {key_exists, _} = ?M:add(BrickName, Node, "t50-s1", "t50-s1-val666"),
-    ok = ?M:replace(BrickName, Node, "t50-s1", "t50-s1-val2"),
+    {ok, _} = ?M:replace(BrickName, Node, "t50-s1", "t50-s1-val2"),
 
     Val2K = list_to_binary(lists:duplicate(2*1024, $x)),
     _Val2K_y = list_to_binary(lists:duplicate(2*1024, $y)),
@@ -762,7 +754,7 @@ t51(BrickName, Node, NumProcs, PhaseTime, DoSet) ->
                       [NumProcs, PhaseTime]),
             Set1 = fun(N, ProcNum) ->
                            K = lists:flatten(io_lib:format("t50-Fun1-~w-~w", [ProcNum, N - 1])),
-                           ok = ?M:set(BrickName, Node, K, Val2K)
+                           {ok, _} = ?M:set(BrickName, Node, K, Val2K)
                    end,
             SetPids = [spawn(fun() -> loop_msg_stop(Set1, PN) end) ||
                           PN <- lists:seq(1, NumProcs)],
@@ -848,7 +840,7 @@ t51(BrickName, Node, NumProcs, PhaseTime, DoSet) ->
     %%                  Val4B = list_to_binary("foo" ++ atom_to_list(Node)),
     %%                  F1 = fun(N) ->
     %%                               K = lists:flatten(io_lib:format("t50-Fun1-~w-~w", [node(), N])),
-    %%                               [ok] = ?M:set([Node], K, Val4B)
+    %%                               [{ok, _}] = ?M:set([Node], K, Val4B)
     %%                       end,
     %%                  {T1a, _R} = timer:tc(?MODULE, loopN, [Num, F1]),
     %%                  io:format("done in ~w secs (~w op/sec)\n", [T1a / 1000000, Num / (T1a / 1000000)]),
@@ -1089,7 +1081,7 @@ t9(BrickName, Node) ->
     io:format("Status before flush_all = ~p\n", [Status0]),
     ok = ?M:flush_all(BrickName, Node),
     %%
-    ok = ?M:add(BrickName, Node, "delme", <<"delme1">>),
+    {ok, _} = ?M:add(BrickName, Node, "delme", <<"delme1">>),
     {ok, _TSD1, <<"delme1">>} = ?M:get(BrickName, Node, "delme"),
     key_not_exist = ?M:delete(BrickName, Node, "delmefoo"),
     ok = ?M:delete(BrickName, Node, "delme"),
@@ -1104,7 +1096,7 @@ t10(BrickName, Node) ->
     io:format("Test t10: start\n"),
 
     Key = <<"/bz22015/foo">>,
-    ok = ?M:set(BrickName, Node, Key, <<"BZ22015 regression test">>),
+    {ok, _} = ?M:set(BrickName, Node, Key, <<"BZ22015 regression test">>),
     F = fun(_Key0, _DoOp, _DoFlags, _S0) ->
                 Val = ?VALUE_REMAINS_CONSTANT,
                 Mod = brick_server:make_replace(Key, Val, 0, []),
@@ -1112,7 +1104,7 @@ t10(BrickName, Node) ->
         end,
     Do = brick_server:make_ssf(Key, F),
     %% If buggy, we'll get crash instead of good match.
-    [ok] = ?M:do(BrickName, Node, [Do], [], 5*1000),
+    [{ok, _}] = ?M:do(BrickName, Node, [Do], [], 5*1000),
 
     io:format("Test t10: end\n"),
     ok.
@@ -1148,7 +1140,7 @@ t90(BrickName0, Node, OptionList, DoCheckpointP) ->
                     ok
             end,
     Fset = fun() ->
-                   [ok = ?M:set(BrickName, Node, K, V) ||
+                   [{ok, _} = ?M:set(BrickName, Node, K, V) ||
                        {K, V} <- [{"k1", "v1"}, {"k2", "v2"}, {<<"k3">>, <<"v3">>}]]
            end,
 
@@ -1170,7 +1162,7 @@ t90(BrickName0, Node, OptionList, DoCheckpointP) ->
                                 ?BRICK__GET_MANY_FIRST, 9999),
 
     [ok = ?M:md_test_delete(BrickName, Node, K) || K <- Ks],
-    [ok = ?M:md_test_set(BrickName, Node, K, V) || {K, V} <- KVs],
+    [{ok, _} = ?M:md_test_set(BrickName, Node, K, V) || {K, V} <- KVs],
     [[KV] = ?M:md_test_get(BrickName, Node, K) || {K, _} = KV <- KVs],
     [[] = ?M:md_test_get(BrickName, Node, K) || K <- Ks_bad],
 
@@ -1229,7 +1221,7 @@ t91b(BrickName, Node, OptionList) ->
     Key = <<"foo">>,
     Val = <<"fooval">>,
 
-    ok = ?M:set(BrickName, Node, Key, Val),
+    {ok, _} = ?M:set(BrickName, Node, Key, Val),
     ok = ?M:checkpoint(BrickName, Node),
     timer:sleep(500),
     %% io:format("dump 0: ~p\n", [ets:tab2list(zoo_store)]),
@@ -1430,13 +1422,13 @@ chain_t10(NameHead, NameTail, StartupP, InsertP, EtsTestP, KillP, OptionList) ->
             %% Put some "old" stuff into the will-be-tail
             ?M:chain_role_standalone(NameTail, Node),
             ?M:chain_set_my_repair_state(NameTail, Node, ok),
-            [ok = ?M:set(NameTail, Node, K, V) || {K, V} <- ManyEvens],
-            [ok = ?M:set(NameTail, Node, K, V) || {K, V} <- StuffAtEnd],
+            [{ok, _} = ?M:set(NameTail, Node, K, V) || {K, V} <- ManyEvens],
+            [{ok, _} = ?M:set(NameTail, Node, K, V) || {K, V} <- StuffAtEnd],
 
             %% Put some "new" stuff into the will-be-head.
             ?M:chain_role_standalone(NameHead, Node),
             ?M:chain_set_my_repair_state(NameHead, Node, ok),
-            [ok = ?M:set(NameHead, Node, K, V) || {K, V} <- Odds];
+            [{ok, _} = ?M:set(NameHead, Node, K, V) || {K, V} <- Odds];
        true ->
             ok
     end,
@@ -1460,9 +1452,9 @@ chain_t10(NameHead, NameTail, StartupP, InsertP, EtsTestP, KillP, OptionList) ->
     if InsertP == true ->
             %% Set some stuff in head before starting repair.  These things
             %% should be propagated to tail now.
-            ok = ?M:set(NameHead, Node, "zoo1", "the zoo 1"),
+            {ok, _} = ?M:set(NameHead, Node, "zoo1", "the zoo 1"),
             timer:sleep(200),
-            ok = ?M:set(NameHead, Node, "zoo2", "the zoo 2"),
+            {ok, _} = ?M:set(NameHead, Node, "zoo2", "the zoo 2"),
             timer:sleep(200);
        true ->
             ok
@@ -1534,9 +1526,9 @@ chain_t20(OptionList) ->
     [{ok, _, <<"seven">>}] = ?M:do(Ch1Tail, Node, Do_get_foo7, [ignore_role], 5*1000),
 
     %% Sets to the head are OK.
-    [ok] = ?M:do(Ch1Head, Node, Do_set_zzz9, [], 5*1000),
+    [{ok, _}] = ?M:do(Ch1Head, Node, Do_set_zzz9, [], 5*1000),
     %% QQQ = ?M:do(Ch1Head, Node, [?M:make_get("zzz9")], [], 5*1000), io:format("QQQ: QQQ = ~p\n", [QQQ]), io:format("QQQ: head tab = ~p\n", [ets:tab2list(ch1_head_store)]), io:format("QQQ: tail tab = ~p\n", [ets:tab2list(ch1_tail_store)]),
-    [ok] = ?M:do(Ch1Head, Node, Do_set_zzz9, [ignore_role], 5*1000),
+    [{ok, _}] = ?M:do(Ch1Head, Node, Do_set_zzz9, [ignore_role], 5*1000),
 
     %% Sets to the tail are wrong for the tail's role.
 
@@ -1566,14 +1558,14 @@ chain_t20(OptionList) ->
     %%
     {ok, _, <<"five">>} = brick_simple:get(Tab, "foo5"),
     {key_exists, _} = brick_simple:add(Tab, "foo5", "gonna-fail"),
-    ok = brick_simple:replace(Tab, "foo5", "ah hah!"),
+    {ok, _} = brick_simple:replace(Tab, "foo5", "ah hah!"),
     {ok, _, <<"ah hah!">>} = brick_simple:get(Tab, "foo5"),
     ok = brick_simple:delete(Tab, "foo5"),
     key_not_exist = brick_simple:replace(Tab, "foo5", "ah hah!"),
-    ok = brick_simple:add(Tab, "foo5", "ah hah!"),
+    {ok, _} = brick_simple:add(Tab, "foo5", "ah hah!"),
     {key_exists, _} = brick_simple:add(Tab, "foo5", "ah hah!"),
     %% Put it back to the way it was before messing with it.
-    ok = brick_simple:replace(Tab, "foo5", "five"),
+    {ok, _} = brick_simple:replace(Tab, "foo5", "five"),
 
     %% Create bad hash state...
     BogusBrick = {blarf, zoof@zoof},
@@ -1659,14 +1651,14 @@ chain_t25(OptionList) ->
                 %%
                 {ok, _, <<"five">>} = brick_simple:get(Tab, "foo5"),
                 {key_exists, _} = brick_simple:add(Tab, "foo5", "gonna-fail"),
-                ok = brick_simple:replace(Tab, "foo5", "ah hah!"),
+                {ok, _} = brick_simple:replace(Tab, "foo5", "ah hah!"),
                 {ok, _, <<"ah hah!">>} = brick_simple:get(Tab, "foo5"),
                 ok = brick_simple:delete(Tab, "foo5"),
                 key_not_exist = brick_simple:replace(Tab, "foo5", "ah hah!"),
-                ok = brick_simple:add(Tab, "foo5", "ah hah!"),
+                {ok, _} = brick_simple:add(Tab, "foo5", "ah hah!"),
                 {key_exists, _} = brick_simple:add(Tab, "foo5", "ah hah!"),
                 %% Put it back to the way it was before messing with it.
-                ok = brick_simple:replace(Tab, "foo5", "five"),
+                {ok, _} = brick_simple:replace(Tab, "foo5", "five"),
 
                 ok
         end,
@@ -1870,7 +1862,7 @@ chain_t30(OptionList) ->
                   lists:zip3(Tabs, KsVss, GHs))),
 
     %% Put some stuff into each table
-    [ok = brick_simple:set(Tab, Key, Val) ||
+    [{ok, _} = brick_simple:set(Tab, Key, Val) ||
         {Tab, Key, Val, _} <- ToStore],
 
     %% Verify that each value is where we expect it ...
@@ -1982,7 +1974,7 @@ chain_t31(OptionList) ->
                   lists:zip3(Tabs, KsVss, GHs))),
 
     %% Put some stuff into each table
-    [ok = brick_simple:set(Tab, Key, Val) ||
+    [{ok, _} = brick_simple:set(Tab, Key, Val) ||
         {Tab, Key, Val, _} <- ToStore],
 
     %% Verify that each value is where we expect it ...
@@ -2078,7 +2070,7 @@ chain_t35(OptionList) ->
                                            MinQuorum - 1
                                    end,
                         FailBricks = lists:sublist(my_shuffle(Bricks0), NumFails),
-                        ok = ?SQ:set(Bricks0, K, V),
+                        {ok, _} = ?SQ:set(Bricks0, K, V),
                         {ok, _, V} = ?SQ:get(Bricks0, K),
                         [ok = ?M:delete(Br, Nd, K) || {Br, Nd} <- FailBricks],
                         {ok, _, V} = ?SQ:get(Bricks0, K),
@@ -2105,20 +2097,20 @@ chain_t35(OptionList) ->
                                            MinQuorum
                                    end,
                         FailBricks = lists:sublist(my_shuffle(Bricks0), NumFails),
-                        ok = ?SQ:set(Bricks0, K, V),
+                        {ok, _} = ?SQ:set(Bricks0, K, V),
                         [ok = ?M:delete(Br, Nd, K) || {Br, Nd} <- FailBricks],
                         {key_not_exist, QSize, MinQuorum, NumFails} =
                             {?SQ:get(Bricks0, K), QSize, MinQuorum, NumFails},
                         %% Should not exist now on *any* of the bricks.
                         [key_not_exist = ?M:get(Br, Nd, K)
                          || {Br, Nd} <- Bricks0],
-                        ok = ?SQ:set(Bricks0, K, V),
+                        {ok, _} = ?SQ:set(Bricks0, K, V),
                         [ok = ?M:delete(Br, Nd, K) || {Br, Nd} <- FailBricks],
                         key_not_exist = ?SQ:delete(Bricks0, K)
                 end, KsVs)
       end, lists:seq(1, 9, 2) ++ [2]),
 
-    [ok = ?SQ:set(Bricks, K, V) || {K, V} <- KsVs],
+    [{ok, _} = ?SQ:set(Bricks, K, V) || {K, V} <- KsVs],
     %% io:format("XXX: Bricks = ~p\n", [Bricks]),
     %% Me = garn,
     %% register(Me, self()),
@@ -2134,7 +2126,7 @@ chain_t35(OptionList) ->
     %% key missing, one key out-of-date ... and with 3 total failures,
     %% everything will still work.
 
-    [ok = ?SQ:set(Bricks, K, V) || {K, V} <- KsVs],
+    [{ok, _} = ?SQ:set(Bricks, K, V) || {K, V} <- KsVs],
     [_, {FooB0, _FooN0}|_] = Bricks,
     ?M:stop(whereis(FooB0)),
     lists:foreach(
@@ -2264,7 +2256,7 @@ chain_t41(OptionList) ->
     _Syncs2 = sync_poll(B1, N1, 100),
     %%io:format("QQQ: Syncs2 = ~w\n", [_Syncs2]),
 
-    ok = brick_server:set(B1, N1, K3, V3),
+    {ok, _} = brick_server:set(B1, N1, K3, V3),
 
     _Syncs3 = sync_poll(B1, N1, 100),
     %%io:format("QQQ: Syncs3 = ~w\n", [_Syncs3]),
@@ -2350,8 +2342,8 @@ chain_t50_common2(WhoToKill, ExitAfterKillP, OptionList) ->
     NumKeys = 100,
     [begin
          Sfx = integer_to_list(N),
-         ok = brick_simple:set(testtab, gmt_util:bin_ify("key " ++ Sfx),
-                               gmt_util:bin_ify("val " ++ Sfx))
+         {ok, _} = brick_simple:set(testtab, gmt_util:bin_ify("key " ++ Sfx),
+                                    gmt_util:bin_ify("val " ++ Sfx))
      end || N <- lists:seq(1, NumKeys)],
     io:format("Put keys finished\n"),
 
@@ -2523,8 +2515,8 @@ chain_t51_common(WhoToKill, ExitAfterKillP, OptionList) ->
     NumKeys = 100,
     [begin
          Sfx = integer_to_list(N),
-         ok = brick_simple:set(testtab, gmt_util:bin_ify("key " ++ Sfx),
-                               gmt_util:bin_ify("val " ++ Sfx))
+         {ok, _} = brick_simple:set(testtab, gmt_util:bin_ify("key " ++ Sfx),
+                                    gmt_util:bin_ify("val " ++ Sfx))
      end || N <- lists:seq(1, NumKeys)],
     io:format("Put keys finished\n"),
 
@@ -2964,7 +2956,7 @@ chain_t56(OptionList) ->
     timer:sleep(5*1000),                        % Timing-sensitive, sorry.
 
     io:format("Putting initial keys...\n"),
-    [ok = brick_simple:set(Tab, "goo"++integer_to_list(X), "val!") ||
+    [{ok, _} = brick_simple:set(Tab, "goo"++integer_to_list(X), "val!") ||
         X <- lists:seq(1, 20)],
 
     ?ELOG_INFO("Kill ~p, wait a little bit, then kill ~p while ~p is still\n"
@@ -3036,7 +3028,7 @@ chain_t100() ->
     timer:sleep(5*1000),                    % Timing-sensitive, sorry.
 
     io:format("Putting initial keys...\n"),
-    [ok = brick_simple:set(Tab, "goo"++integer_to_list(X), "val!") ||
+    [{ok, _} = brick_simple:set(Tab, "goo"++integer_to_list(X), "val!") ||
         X <- lists:seq(1, 200)],
 
     ?ELOG_INFO(
@@ -3370,9 +3362,9 @@ chain_t60(NameHead, NameTail, StartupP, InsertP, EtsTestP, KillP, OptionList) ->
         InsertP == true ->
             %% Set some stuff in head before starting repair.  These things
             %% should be propagated to tail now.
-            ok = ?M:set(NameHead, Node, <<"fib">>, <<"11235813213455">>),
+            {ok, _} = ?M:set(NameHead, Node, <<"fib">>, <<"11235813213455">>),
             timer:sleep(200),
-            ok = ?M:set(NameHead, Node, <<"pi">>, <<"314159265358979323846264338">>),
+            {ok, _} = ?M:set(NameHead, Node, <<"pi">>, <<"314159265358979323846264338">>),
             timer:sleep(200);
         true ->
             ok
@@ -3462,7 +3454,7 @@ chain_t61(OptionList) ->
                    {insert, {<<"2">>, 42, <<"v 2">>, 0, []}}],
                   <<"2">>},
     gen_server:cast({Name1, Node}, Race1Sweep),
-    ok = brick_simple:set(Tab, Race1Key, <<"v 1b">>),
+    {ok, _} = brick_simple:set(Tab, Race1Key, <<"v 1b">>),
     poll_migration_finished(FirstBrick),
     [{ok, _, _} = brick_server:migration_clear_sweep(Br, Nd) ||
         {Br, Nd} <- FirstBrick],
@@ -3496,7 +3488,7 @@ chain_t61(OptionList) ->
     %%     {Name2, Node} ! kick_next_sweep,
     %%     timer:sleep(20),
     %%     OK, now let's do the race, using the same bits from race #1.
-    %%     spawn(fun() -> ok = brick_simple:set(Tab, Race1Key, <<"v 1b">>) end),
+    %%     spawn(fun() -> {ok, _} = brick_simple:set(Tab, Race1Key, <<"v 1b">>) end),
     %%     erlang:yield(),
     %%     timer:sleep(10),
     %%     gen_server:cast({Name1, Node}, Race1Sweep),
@@ -3546,7 +3538,7 @@ chain_t61(OptionList) ->
     %% have the restart work correctly.
     %% At the start we have 1 chain of length 1 via GHmig3.
     NumRace3 = 30,
-    [begin KV = integer_to_list(X), ok = brick_simple:set(Tab, KV, KV) end ||
+    [begin KV = integer_to_list(X), {ok, _} = brick_simple:set(Tab, KV, KV) end ||
         X <- lists:seq(0, NumRace3)],
     GHmig4 = brick_hash:init_global_hash_state(true, pre, 1,
                                                LHmig3b, Chain1List,
@@ -3646,7 +3638,7 @@ chain_t62(OptionList) ->
     OldVal = <<"old-val">>,
     MidVal = <<"mid-val">>,
     _NewVal = <<"new-val">>,
-    ok = ?M:set(NameHead, Node, Key, OldVal),
+    {ok, _} = ?M:set(NameHead, Node, Key, OldVal),
     {ok, _, OldVal} = ?M:get(NameTail, Node, Key),
     Ack0 = get_chain_last_ack(NameHead, Node),
     Ack1 = get_chain_last_ack_different(NameHead, Node, Ack0, 10),
@@ -3660,7 +3652,7 @@ chain_t62(OptionList) ->
     %%
     timer:sleep(10),
     brick_server:chain_flush_log_downstream(NameHead, Node),
-    %% ok = ?M:set(NameHead, Node, Key, NewVal),
+    %% {ok, _} = ?M:set(NameHead, Node, Key, NewVal),
     _Ack2 = get_chain_last_ack_different(NameHead, Node, Ack1, 10),
 
     _GetRes = ?M:get(NameTail, Node, Key),
@@ -3886,7 +3878,7 @@ put_rand_keys_via_simple(Tab, MaxKey, Num, KeyPrefix, KeySuffix, ValLen,
                      RandL = integer_to_list(random:uniform(MaxKey)),
                      Key = gmt_util:bin_ify(KeyPrefix ++ RandL ++ KeySuffix),
                      case brick_simple:set(Tab, Key, Val, 60*1000) of
-                         ok -> ok;
+                         {ok, _} -> ok;
                          {ts_error, _} -> ok
                      end,
                      if (DoAsyncP) ->
@@ -4080,16 +4072,16 @@ reliable_gdss_stop() ->
 reliable_gdss_stop_and_start() ->
     brick_eunit_utils:setup().
 
--ifdef(GMTQC).
+-ifdef(QC).
 qc_check(NumTests, NumMore, Props) ->
-    true = ?GMTQC:quickcheck(
+    true = ?QC:quickcheck(
               noshrink(
                 numtests(
                   NumTests, more_commands(NumMore, Props)))).
 -else.
 qc_check(_NumTests, _NumMore, _Props) ->
     true.
--endif. %% -ifdef(GMTQC).
+-endif. %% -ifdef(QC).
 
 cl_eqc_hlog_local_eqc__t1() ->
     cl_eqc_hlog_local_eqc__t1(?NUM_EQC_TESTS_DEFAULT).

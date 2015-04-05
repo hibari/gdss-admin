@@ -1,5 +1,5 @@
 %%%----------------------------------------------------------------------
-%%% Copyright (c) 2009-2013 Hibari developers.  All rights reserved.
+%%% Copyright (c) 2009-2015 Hibari developers.  All rights reserved.
 %%%
 %%% Licensed under the Apache License, Version 2.0 (the "License");
 %%% you may not use this file except in compliance with the License.
@@ -16,6 +16,15 @@
 %%% File    : brick_admin.hrl
 %%% Purpose : brick admin stuff
 %%%----------------------------------------------------------------------
+
+-ifndef(hibari_dict).
+-define(hibari_dict, true).
+-ifdef(namespaced_dict_and_queue).
+-type hibari_dict()  :: dict:dict().
+-else.
+-type hibari_dict()  :: dict().
+-endif. %% namespaced_dict_and_queue
+-endif. %% hibari_dict
 
 -define(BKEY_SCHEMA_DEFINITION, schema_definition).
 -define(BKEY_CLIENT_MONITOR,    client_monitor_list).
@@ -46,10 +55,10 @@
 
           %% Dictionary of all table definitions
           %% Key = table name, Val = table_r()
-          tabdefs                               :: dict(),
+          tabdefs                               :: hibari_dict(),
 
           %% Mapping of chain to table name
-          chain2tab                             :: dict()
+          chain2tab                             :: hibari_dict()
          }).
 
 -record(table_r, {
