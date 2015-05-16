@@ -1,5 +1,5 @@
 %%%----------------------------------------------------------------------
-%%% Copyright: (c) 2009-2014 Hibari developers.  All rights reserved.
+%%% Copyright (c) 2009-2015 Hibari developers.  All rights reserved.
 %%%
 %%% Licensed under the Apache License, Version 2.0 (the "License");
 %%% you may not use this file except in compliance with the License.
@@ -21,7 +21,8 @@
 
 -ifdef(QC).
 
--include_lib("qc/include/qc.hrl").
+-eqc_group_commands(false).
+-include_lib("qc/include/qc_statem.hrl").
 
 -include("gmt_hlog.hrl").
 -include_lib("kernel/include/file.hrl").
@@ -48,12 +49,15 @@ run() ->
     run(500).
 
 run(NumTests) ->
-    gmt_eqc:module({numtests,NumTests}, ?MODULE).
+    qc_statem:qc_run(?MODULE, NumTests, []).
 
 prop_log() ->
     prop_log(false).
 
 prop_log(EnableScribbleTestP) ->
+    %% This will initialize app env 'brick_default_data_dir'
+    _ = application:load(gdss_brick),
+
     io:format("\nNOTE: Failure due to 'hunk_header_too_big' exception\n"
               "is not a real failure and can be ignored safely.\n\n"),
     %%timer:sleep(1000),

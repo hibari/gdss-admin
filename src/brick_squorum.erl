@@ -1,5 +1,5 @@
 %%%-------------------------------------------------------------------
-%%% Copyright (c) 2007-2014 Hibari developers.  All rights reserved.
+%%% Copyright (c) 2007-2015 Hibari developers.  All rights reserved.
 %%%
 %%% Licensed under the Apache License, Version 2.0 (the "License");
 %%% you may not use this file except in compliance with the License.
@@ -61,6 +61,7 @@
 -type get_res() :: brick_server:get_reply() | error | quorum_error.
 -type delete_res() :: brick_server:delete_reply() | error | quorum_error.
 -type get_keys_res() :: {ok, list(), boolean()}.
+-type do_op() :: tuple().
 
 -spec set(brick_list(), bin_key(), val()) -> set_res().
 %%-spec set(brick_list(), bin_key(), val(), flags_list() | integer()) -> set_res().
@@ -76,11 +77,16 @@ set(Bricks, Key, Value, Timeout) when is_integer(Timeout) ->
 
 set(Bricks, Key, Value, ExpTime, Flags, Timeout)
   when is_list(Bricks) ->                       % Assume a list of bricks
-    do1(Bricks, ?SINGLE:make_set(Key, Value, ExpTime, Flags),
+    %% Assign timestamp here because squorum doesn't work with server-side timestamp.
+    Timestamp = ?SINGLE:make_timestamp(),
+    do1(Bricks, ?SINGLE:make_set(Key, Timestamp, Value, ExpTime, Flags),
         Timeout, 0).
 
 multiset(Bricks, Ops) ->
-    do_multi(Bricks, Ops, ?FOO_TIMEOUT, 0).
+    %% Assign timestamp here because squorum doesn't work with server-side timestamp.
+    Timestamp = ?SINGLE:make_timestamp(),
+    Ops1 = assign_timestamp(Timestamp, Ops),
+    do_multi(Bricks, Ops1, ?FOO_TIMEOUT, 0).
 
 -spec get(brick_list(), bin_key()) -> get_res().
 %%-spec get(brick_list(), bin_key(), flags_list() | integer()) -> get_res().
@@ -424,6 +430,20 @@ find_nonconforming_bricks(Answer, Rs) ->
                    ({Brick, _BadA}, Acc)                 -> [Brick|Acc]
                 end, [], Rs).
 
+-spec assign_timestamp(integer(), [do_op()]) -> [do_op()].
+assign_timestamp(Timestamp, Ops) ->
+    F = fun({Op, _K, 0, _V, _Exp, _F}=DoOp)
+              when Op =:= add;
+                   Op =:= replace;
+                   Op =:= set;
+                   Op =:= rename ->
+                setelement(3, DoOp, Timestamp);
+           (DoOp) ->
+                DoOp
+        end,
+    lists:map(F, Ops).
+
+%% unit case
 t0() ->
     Rs0 = [],
     Rs1 = [{h1, ok}],

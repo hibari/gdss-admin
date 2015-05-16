@@ -1,5 +1,5 @@
 %%%----------------------------------------------------------------------
-%%% Copyright: (c) 2010-2014 Hibari developers.  All rights reserved.
+%%% Copyright (c) 2010-2015 Hibari developers.  All rights reserved.
 %%%
 %%% Licensed under the Apache License, Version 2.0 (the "License");
 %%% you may not use this file except in compliance with the License.
@@ -21,7 +21,8 @@
 
 -ifdef(QC).
 
--include_lib("qc/include/qc.hrl").
+-eqc_group_commands(false).
+-include_lib("qc/include/qc_statem.hrl").
 
 -export([run/0, run/1]).
 -export([start_noshrink/0, start_noshrink/1]).
@@ -31,11 +32,11 @@
 -export([counterexample_commands/0, counterexample_commands/1, counterexample_commands/2]).
 -export([counterexample_commands_read/1, counterexample_commands_write/1, counterexample_commands_write/2]).
 
--export([initial_state/0, state_is_sane/1, next_state/3, precondition/2, postcondition/3]).
--export([commands_setup/1, commands_teardown/1, commands_teardown/2]).
--export([command_gen/2]).
-
-%%TODO: -behaviour(gmt_eqc_statem).
+%% qc_statem Callbacks
+%% -behaviour(qc_statem).
+-export([command/1]).
+-export([initial_state/0, initial_state/1, next_state/3, invariant/1, precondition/2, postcondition/3]).
+-export([init/0, init/1, stop/2, aggregate/1]).
 
 -export([restart/1]).
 -export([stop/1]).
@@ -57,6 +58,8 @@
 -define(REGNAMES, [a_hlog,b_hlog,c_hlog]).
 -define(DIRNAMES, ["hlog.a","hlog.b","hlog.c"]).
 -define(FILELENFACTOR, 32).
+
+-type proplist() :: proplists:proplist().
 
 -record(state,
         {parallel=false
@@ -107,39 +110,40 @@ run() ->
     run(500).
 
 run(NumTests) ->
-    ?QC:quickcheck(numtests(NumTests,prop_commands([{parallel,false}]))).
+    qc_statem:qc_run(?MODULE, NumTests, [{parallel,false}]).
 
 start_noshrink() ->
     start_noshrink(500).
 
 start_noshrink(NumTests) ->
-    ?QC:quickcheck(numtests(NumTests,noshrink(prop_commands([{parallel,false}])))).
+    qc_statem:qc_run(?MODULE, NumTests, [noshrink, {parallel,false}]).
 
 run_parallel() ->
     run_parallel(500).
 
 run_parallel(NumTests) ->
-    ?QC:quickcheck(numtests(NumTests,prop_commands([{parallel,true}]))).
+    qc_statem:qc_run(?MODULE, NumTests, [{parallel,true}]).
 
 run_parallel_noshrink() ->
     run_parallel_noshrink(500).
 
 run_parallel_noshrink(NumTests) ->
-    ?QC:quickcheck(numtests(NumTests,noshrink(prop_commands([{parallel,true}])))).
+    qc_statem:qc_run(?MODULE, NumTests, [noshrink, {parallel,true}]).
 
 %% sample commands
 sample_commands() ->
     sample_commands([]).
 
 sample_commands(Options) ->
-    gmt_eqc_statem:gmt_sample_commands(?MODULE, Options).
+    qc_statem:qc_sample(?MODULE, Options).
 
 %% prop commands
 prop_commands() ->
     prop_commands([]).
 
 prop_commands(Options) ->
-    gmt_eqc_statem:gmt_run_commands(?MODULE, Options).
+    error_logger:delete_report_handler(error_logger_tty_h),
+    qc_statem:qc_prop(?MODULE, Options).
 
 %% counterexample commands
 counterexample_commands() ->
@@ -149,7 +153,7 @@ counterexample_commands(Options) ->
     counterexample_commands(Options, ?QC:counterexample()).
 
 counterexample_commands(Options, CounterExample) ->
-    ?QC:check(prop_commands(Options), CounterExample).
+    qc_statem:qc_counterexample(?MODULE, Options, CounterExample).
 
 %% counterexample commands read
 counterexample_commands_read(FileName) ->
@@ -164,14 +168,23 @@ counterexample_commands_write(FileName, CounterExample) ->
     file:write_file(FileName, io_lib:format("~p.", [CounterExample])).
 
 %%%----------------------------------------------------------------------
-%%% CALLBACKS - gmt_eqc_statem
+%%% CALLBACKS - qc_statem
 %%%----------------------------------------------------------------------
 
-%% (Mod::atom(),S::symbolic_state()) -> gen()
-command_gen(_Mod,_S) ->
+-spec init() -> ok.
+init() ->
+    commands_setup(true),
+    ok.
+
+-spec init(#state{}) -> ok.
+init(_S) ->
+    commands_setup(true),
+    ok.
+
+command(_S) ->
     %% DEBUG io:format("~p ~p~n", [TypeName]),
-    ?LET(TypeName,command_typenamegen(_Mod,_S),
-         ?LET(Type,command_typegen(_Mod,_S,TypeName),
+    ?LET(TypeName,command_typenamegen(_S),
+         ?LET(Type,command_typegen(_S,TypeName),
               begin
                   if is_atom(Type) ->
                           {call,?MODULE,Type,[]};
@@ -224,8 +237,7 @@ command_gen(_Mod,_S) ->
 %%
 
 
-%% (Mod::atom(),S::symbolic_state(),TypeName::atom()) -> gen()
-command_typenamegen(_Mod,#state{parallel=Parallel,pids=Pids}=S) ->
+command_typenamegen(#state{parallel=Parallel,pids=Pids}=S) ->
     ?LET(Hunks,all_good_hunks(S),
          oneof([restart
                ]
@@ -248,24 +260,23 @@ command_typenamegen(_Mod,#state{parallel=Parallel,pids=Pids}=S) ->
                     || [] =/= Pids ]
               )).
 
-%% (Mod::atom(),S::symbolic_state(),TypeName::atom()) -> gen()
-command_typegen(Mod,S,restart) ->
+command_typegen(S,restart) ->
     %% restart(props())
-    {restart, command_typegen(Mod,S,props)};
-command_typegen(Mod,S,stop) ->
+    {restart, command_typegen(S,props)};
+command_typegen(S,stop) ->
     %% stop(server())
-    {stop, command_typegen(Mod,S,server)};
-command_typegen(Mod,S,kill) ->
+    {stop, command_typegen(S,server)};
+command_typegen(S,kill) ->
     %% kill(server())
-    {kill, command_typegen(Mod,S,server)};
-command_typegen(Mod,S,write_hunk) ->
+    {kill, command_typegen(S,server)};
+command_typegen(S,write_hunk) ->
     %% write_hunk(server(), LocalBrickName::atom(), HLogType::metadata|bigblob|bigblob_longterm, Key::iolist(), TypeNum::integer(), CBlobs::list(iolist()), UBlobs::list(iolist))
     ?SIZED(Size,
            ?LET(N,choose(1,erlang:max(1,Size)),
                 %% ASSUMPTION: read_hunk assumes the length of either
                 %% cblobs or ublobs is non-empty
                 oneof([{write_hunk
-                        , command_typegen(Mod,S,server)
+                        , command_typegen(S,server)
                         , undefined %% not used
                         , oneof([metadata, bigblob, bigblob_longterm])
                         , binary()
@@ -274,7 +285,7 @@ command_typegen(Mod,S,write_hunk) ->
                         , list(binary(1,N))
                        }
                        , {write_hunk
-                          , command_typegen(Mod,S,server)
+                          , command_typegen(S,server)
                           , undefined %% not used
                           , oneof([metadata, bigblob, bigblob_longterm])
                           , binary()
@@ -283,14 +294,14 @@ command_typegen(Mod,S,write_hunk) ->
                           , oneof([[binary(1,N)], [binary(1,N)|list(binary(1,N))]])
                          }
                       ])));
-command_typegen(Mod,S,read_hunk) ->
+command_typegen(S,read_hunk) ->
     %% read_hunk(server(), seqnum(), offset())
     %% read_hunk(server(), seqnum(), offset(), lenhintORxformfun())
     %% read_hunk(server(), seqnum(), offset(), lenhint(), xformfun())
     Hunks = all_good_hunks(S),
     ?LET({#server{pid=Pid},Log,#hunk{seqnum=SeqNum,offset=Offset,len=Len}},oneof(Hunks),
          begin
-             LenHint = oneof([Len,command_typegen(Mod,S,lenhint)]),
+             LenHint = oneof([Len,command_typegen(S,lenhint)]),
              oneof([{read_hunk
                      , Pid
                      , SeqNum
@@ -307,77 +318,79 @@ command_typegen(Mod,S,read_hunk) ->
                    ])
          end
         );
-command_typegen(Mod,S,advance_seqnum) ->
+command_typegen(S,advance_seqnum) ->
     %% advance_seqnum(server(), incr())
-    {advance_seqnum, command_typegen(Mod,S,server), command_typegen(Mod,S,incr)};
-command_typegen(_Mod,S,move_seq_to_longterm) ->
+    {advance_seqnum, command_typegen(S,server), command_typegen(S,incr)};
+command_typegen(S,move_seq_to_longterm) ->
     %% move_seq_to_longterm(server(), seqnum())
     SeqNums = all_good_seqnums(S),
     ?LET({#server{pid=Pid},Log,SeqNum},oneof(SeqNums),
          {move_seq_to_longterm, Pid, SeqNum, Log});
-command_typegen(Mod,S,get_current_seqnum) ->
+command_typegen(S,get_current_seqnum) ->
     %% get_current_seqnum(server())
-    {get_current_seqnum, command_typegen(Mod,S,server)};
-command_typegen(Mod,S,get_all_seqnums) ->
+    {get_current_seqnum, command_typegen(S,server)};
+command_typegen(S,get_all_seqnums) ->
     %% get_all_seqnums(server())
-    {get_all_seqnums, command_typegen(Mod,S,server)};
-command_typegen(Mod,S,get_current_seqnum_and_file_position) ->
+    {get_all_seqnums, command_typegen(S,server)};
+command_typegen(S,get_current_seqnum_and_file_position) ->
     %% get_current_seqnum_and_file_position(server())
-    {get_current_seqnum_and_file_position, command_typegen(Mod,S,server)};
-command_typegen(Mod,S,get_current_seqnum_and_offset) ->
+    {get_current_seqnum_and_file_position, command_typegen(S,server)};
+command_typegen(S,get_current_seqnum_and_offset) ->
     %% get_current_seqnum_and_offset(server())
-    {get_current_seqnum_and_offset, command_typegen(Mod,S,server)};
-command_typegen(Mod,S,fold) ->
+    {get_current_seqnum_and_offset, command_typegen(S,server)};
+command_typegen(S,fold) ->
     %% fold(shortterm | longterm, dirname(), foldfun(), foldacc())
-    {fold, oneof([shortterm, longterm]), command_typegen(Mod,S,dirname), fun foldfun/3, []};
-command_typegen(_Mod,_S,servername) ->
+    {fold, oneof([shortterm, longterm]), command_typegen(S,dirname), fun foldfun/3, []};
+command_typegen(_S,servername) ->
     oneof(?SERVERNAMES);
-command_typegen(_Mod,S,server) ->
+command_typegen(S,server) ->
     oneof(S#state.pids);
-command_typegen(_Mod,_S,bytes) ->
+command_typegen(_S,bytes) ->
     nat();
-command_typegen(_Mod,_S,checkmd5) ->
+command_typegen(_S,checkmd5) ->
     bool();
-command_typegen(_Mod,_S,dirname) ->
+command_typegen(_S,dirname) ->
     oneof(?DIRNAMES);
-command_typegen(_Mod,_S,incr) ->
+command_typegen(_S,incr) ->
     int();
-command_typegen(_Mod,_S,lenhint) ->
+command_typegen(_S,lenhint) ->
     int();
-command_typegen(_Mod,_S,lenhintORxformfun) ->
-    command_typegen(_Mod,_S,lenhint); %% TODO: xformfun
-command_typegen(_Mod,_S,nth) ->
+command_typegen(_S,lenhintORxformfun) ->
+    command_typegen(_S,lenhint); %% TODO: xformfun
+command_typegen(_S,nth) ->
     nat();
-command_typegen(_Mod,_S,offset) ->
+command_typegen(_S,offset) ->
     int();
-command_typegen(_Mod,_S,props) ->
-    ?LET(Server,command_typegen(_Mod,_S,servername),
-         ?LET(Bytes,command_typegen(_Mod,_S,bytes),
+command_typegen(_S,props) ->
+    ?LET(Server,command_typegen(_S,servername),
+         ?LET(Bytes,command_typegen(_S,bytes),
               [{name,Server}
                , {file_len_max,1+((Bytes+1)*?FILELENFACTOR)}
                , {file_len_min,1+((Bytes+1)*?FILELENFACTOR)}
                , {long_h1_size,int()}
                , {long_h2_size,int()}]));
-command_typegen(_Mod,_S,seqnum) ->
+command_typegen(_S,seqnum) ->
     %% ASSUMPTION: No caller inside the brick_ets, gmt_hlog, and
     %% friends uses {0,0} as a seqnum+offset.  {0,0} has the same
     %% meaning as <<>>
     ?LET(I, int(), if I =:= 0 -> 1; true -> I end);
-command_typegen(_Mod,_S,xformfun) ->
+command_typegen(_S,xformfun) ->
     exit(not_implemented). %% TODO: xformfun
 
 binary(I,J) ->
     ?LET(N,choose(I,J),binary(N)).
 
-%% initial_state -> symbolic_state()
+-spec initial_state() -> #state{}.
 initial_state() ->
-    %%    ?LET(Parallel,parameter(parallel),
-    ?LET(Parallel,false,
-         #state{parallel=Parallel}).
+    initial_state([]).
 
-%% state_is_sane(S::symbolic_state()) -> bool()
-state_is_sane(_S) ->
-    true.
+-spec initial_state(proplist()) -> #state{}.
+initial_state(Opts) ->
+    #state{parallel=proplists:get_value(parallel, Opts, false)}.
+
+%% %% state_is_sane(S::symbolic_state()) -> bool()
+%% state_is_sane(_S) ->
+%%     true.
 
 %% next_state(S::symbolic_state(),R::var(),C::call()) -> symbolic_state()
 %% restart
@@ -480,6 +493,10 @@ next_state_read_hunk(S,V,{call,_,read_hunk,[Pid,SeqNum,_Offset,Log]}) ->
                     S
             end
     end.
+
+-spec invariant(#state{}) -> boolean().
+invariant(_S) ->
+    true.
 
 %% precondition(S::symbolic_state(),C::call()) -> bool()
 precondition(_S,_C) ->
@@ -639,12 +656,26 @@ postcondition_read_hunk(S,{call,_,read_hunk,[Pid,SeqNum,Offset,_Log0]},[Res,_]) 
             not is_alive(S,Pid)
     end.
 
+-spec aggregate([{integer(), term(), term(), #state{}}])
+               -> [{atom(), integer(), term()}].
+aggregate(L) ->
+    [ {Cmd,length(Args),filter_reply(Reply)} || {_N,{set,_,{call,_,Cmd,Args}},Reply,_State} <- L ].
+
+filter_reply({'EXIT',{Err,_}}) ->
+    {error,Err};
+filter_reply(_) ->
+    ok.
+
 %% @doc setup helper
 commands_setup(_Hard) ->
     %% start
     application:start(sasl),
     application:start(crypto),
     application:start(gmt),
+
+    %% This will initialize app env 'brick_default_data_dir'
+    application:load(gdss_brick),
+
     %% cleanup - regnames
     [ catch kill(Pid) || Pid <- ?REGNAMES ],
     timer:sleep(10),
@@ -654,25 +685,12 @@ commands_setup(_Hard) ->
     {ok,[]} = gmt_otp:reload_config(),
     {ok,noop}.
 
-%% @doc teardown helper
-commands_teardown(_) ->
-    ok.
-
-%% @doc teardown helper
-commands_teardown(_,undefined) ->
+-spec stop(#state{}, #state{}) -> ok.
+stop(_State0, undefined) ->
     ok;
-commands_teardown(_,#state{pids=Pids}) ->
+stop(_State0, #state{pids=Pids}) ->
     %% cleanup - pids
     [ catch kill(Pid) || Pid <- Pids ],
-    ok;
-commands_teardown(_, _) ->
-    %% Hibari:
-    %%     {function_clause,
-    %%         [{hlog_blackbox_eqc_tests,commands_teardown,
-    %%              [noop,
-    %%               {state,hlog_blackbox_eqc_tests,{eqc_gen,#Fun<eqc_gen.18.111733221>}}]},
-    %%          {gmt_eqc_statem,'-gmt_run_commands/2-fun-7-',3},
-    %%          .....
     ok.
 
 

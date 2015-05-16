@@ -1,5 +1,5 @@
 %%%----------------------------------------------------------------------
-%%% Copyright: (c) 2009-2014 Hibari developers.  All rights reserved.
+%%% Copyright (c) 2009-2015 Hibari developers.  All rights reserved.
 %%%
 %%% Licensed under the Apache License, Version 2.0 (the "License");
 %%% you may not use this file except in compliance with the License.
@@ -21,7 +21,8 @@
 
 -ifdef(QC).
 
--include_lib("qc/include/qc.hrl").
+-eqc_group_commands(false).
+-include_lib("qc/include/qc_statem.hrl").
 
 -include("gmt_hlog.hrl").
 -include_lib("kernel/include/file.hrl").
@@ -52,11 +53,20 @@ run() ->
     run(500).
 
 run(NumTests) ->
-    gmt_eqc:module({numtests,NumTests}, ?MODULE).
+    qc_statem:qc_run(?MODULE, NumTests, []).
 
 prop_local_log() ->
-    io:format("\n\nNOTE: GDSS app can't be running while this test runs.\n"),
-    io:format("      Run: application:stop(gdss).\n\n"),
+    error_logger:delete_report_handler(error_logger_tty_h),
+
+    io:format("~n~nNOTE: gdss apps can't be running while this test runs.~n"),
+    io:format("      Calling application:stop/1.~n~n"),
+    _ = application:stop(gdss_admin),
+    _ = application:stop(gdss_client),
+    _ = application:stop(gdss_brick),
+
+    %% This will initialize app env 'brick_default_data_dir'
+    _ = application:load(gdss_brick),
+
     %%timer:sleep(2000),
     ?FORALL(Cmds,
             more_commands(5,commands(?MODULE)),

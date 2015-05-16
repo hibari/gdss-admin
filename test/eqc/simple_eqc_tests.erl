@@ -1,5 +1,5 @@
 %%%----------------------------------------------------------------------
-%%% Copyright: (c) 2009-2014 Hibari developers.  All rights reserved.
+%%% Copyright (c) 2009-2015 Hibari developers.  All rights reserved.
 %%%
 %%% Licensed under the Apache License, Version 2.0 (the "License");
 %%% you may not use this file except in compliance with the License.
@@ -21,7 +21,8 @@
 
 -ifdef(QC).
 
--include_lib("qc/include/qc.hrl").
+-eqc_group_commands(false).
+-include_lib("qc/include/qc_statem.hrl").
 
 -export([run/0]).
 -compile(export_all).
@@ -29,14 +30,18 @@
 -include("brick_hash.hrl").
 -include("brick_public.hrl").
 
-%% eqc_statem callbacks
--export([initial_state/0, command/1, precondition/2, postcondition/3,
-         next_state/3]).
+%% qc_statem Callbacks
+%% -behaviour(qc_statem).
+-export([command/1]).
+-export([initial_state/0, initial_state/1, next_state/3, invariant/1, precondition/2, postcondition/3]).
+-export([init/0, init/1, stop/2, aggregate/1]).
+
 
 %%%% -define(MAX_KEYS, 10).
 -define(MAX_KEYS, 4).
 -define(TABLE, tab1).
 
+-type proplist() :: proplists:proplist().
 -type orddict() :: term().
 
 -type key() :: iolist() | string() | binary().
@@ -80,11 +85,23 @@
 eunit_test_() ->
     qc:eunit_module(?MODULE, 3000).
 
+-spec init() -> ok.
+init() ->
+    ok.
+
+-spec init(#state{}) -> ok.
+init(_State) ->
+    ok.
+
+-spec stop(#state{}, #state{}) -> ok.
+stop(_State0, _State) ->
+    ok.
+
 run() ->
     run(500).
 
 run(NumTests) ->
-    gmt_eqc:module({numtests,NumTests}, ?MODULE).
+    qc_statem:qc_run(?MODULE, NumTests, []).
 
 prop_simple1() ->
     common1_prop(fun(X, S) -> X == ok andalso ets_table_sizes_match_p(S) end,
@@ -112,6 +129,7 @@ prop_simple1_noproc_ok() ->
                  end, []).
 
 common1_prop(F_check, Env) ->
+    error_logger:delete_report_handler(error_logger_tty_h),
     setup(),
     timer:sleep(2000),
     io:format("\n\nHibari: get_many() has been commented out from command()\n\n"),
@@ -145,11 +163,12 @@ setup_noop() ->
 teardown_noop(_X) ->
     ok.
 
-%% initial_state() :: symbolic_state().
-%% Called in symbolic context.
-
--spec initial_state() -> symbolic_state().
+-spec initial_state() -> #state{}.
 initial_state() ->
+    initial_state([]).
+
+-spec initial_state(proplist()) -> #state{}.
+initial_state(_Options) ->
     QQQ = now(),
     gmt_loop:do_while(
       fun(_Acc) ->
@@ -576,6 +595,20 @@ next_state2(S, _Result, {call, _, crash_brick, _}) ->
     S;
 next_state2(S, _Result, _Call) ->
     S.
+
+-spec invariant(#state{}) -> boolean().
+invariant(_S) ->
+    true.
+
+-spec aggregate([{integer(), term(), term(), #state{}}])
+               -> [{atom(), integer(), term()}].
+aggregate(L) ->
+    [ {Cmd,length(Args),filter_reply(Reply)} || {_N,{set,_,{call,_,Cmd,Args}},Reply,_State} <- L ].
+
+filter_reply({'EXIT',{Err,_}}) ->
+    {error,Err};
+filter_reply(_) ->
+    ok.
 
 -spec random_key() -> iolist() | string() | binary().
 random_key() ->

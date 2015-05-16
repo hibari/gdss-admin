@@ -1,5 +1,5 @@
 %%%----------------------------------------------------------------------
-%%% Copyright: (c) 2009-2014 Hibari developers.  All rights reserved.
+%%% Copyright (c) 2009-2015 Hibari developers.  All rights reserved.
 %%%
 %%% Licensed under the Apache License, Version 2.0 (the "License");
 %%% you may not use this file except in compliance with the License.
@@ -21,7 +21,8 @@
 
 -ifdef(QC).
 
--include_lib("qc/include/qc.hrl").
+-eqc_group_commands(false).
+-include_lib("qc/include/qc_statem.hrl").
 
 -include_lib("kernel/include/file.hrl").
 
@@ -31,7 +32,7 @@ run() ->
     run(500).
 
 run(NumTests) ->
-    gmt_eqc:module({numtests,NumTests}, ?MODULE).
+    qc_statem:qc_run(?MODULE, NumTests, []).
 
 -record(state, {
           size_f1,

@@ -1,5 +1,5 @@
 %%%-------------------------------------------------------------------
-%%% Copyright (c) 2008-2014 Hibari developers.  All rights reserved.
+%%% Copyright (c) 2008-2015 Hibari developers.  All rights reserved.
 %%%
 %%% Licensed under the Apache License, Version 2.0 (the "License");
 %%% you may not use this file except in compliance with the License.
@@ -1108,12 +1108,12 @@ do_create_new_schema2(InitialBrickList, _PropList) ->
 write_bootstrap_kv(BrickList, Key0, Val0, add) ->
     Key = term_to_binary(Key0),
     Val = term_to_binary(Val0),
-    Op = my_make_add(Key, Val),
-    TS = brick_server:get_op_ts(Op),
+    TS  = brick_server:make_timestamp(),
+    Add = brick_server:make_add(Key, TS, Val, 0, []),
     Res = lists:map(
             fun({Brick, Node} = B) ->
                     catch start_standalone_brick(B),
-                    case catch brick_server:do(Brick, Node, [Op]) of
+                    case catch brick_server:do(Brick, Node, [Add]) of
                         [{ok, _}] ->
                             {B, ok};
                         {'EXIT', {Reason, _}} ->
@@ -1168,19 +1168,6 @@ do_copy_new_schema3(File, FileData) ->
     {_, _, {ok, FileData}} =
         {should_exist, File1, file:read_file(File1)},
     ok.
-
-%% @spec (term(), term()) -> term()
-%% @doc A common make_add() so all uses of this op have the same tstamp.
-
-my_make_add(Key, Value) ->
-    brick_server:make_add(Key, Value).
-
-% my_make_replace(Key, Value, OldTS) ->
-%     brick_server:make_replace(Key, Value, exp_unused, [{testset, OldTS}]).
-
-%% %% TODO move to brick_server?
-%% get_ts_from_op6(Op6) when is_tuple(Op6), size(Op6) == 6 ->
-%%     element(3, Op6).
 
 %% @doc Sanity checking:
 %% <ul>

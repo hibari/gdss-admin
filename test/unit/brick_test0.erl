@@ -1,5 +1,5 @@
 %%%----------------------------------------------------------------------
-%%% Copyright (c) 2009-2014 Hibari developers.  All rights reserved.
+%%% Copyright (c) 2009-2015 Hibari developers.  All rights reserved.
 %%%
 %%% Licensed under the Apache License, Version 2.0 (the "License");
 %%% you may not use this file except in compliance with the License.
@@ -20,7 +20,8 @@
 -module(brick_test0).
 
 -ifdef(QC).
--include_lib("qc/include/qc.hrl").
+-eqc_group_commands(false).
+-include_lib("qc/include/qc_statem.hrl").
 -endif. %% -ifdef(QC).
 
 -include("brick.hrl").
