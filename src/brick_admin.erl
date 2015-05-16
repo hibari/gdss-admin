@@ -995,7 +995,6 @@ bootstrap_existing_schema2(BrickList) ->
     %% Get schema-storing nodes running, as many as possible.
     %% We don't care if we encounter most errors.
     _ = [catch start_standalone_brick(Brick) || Brick <- BrickList],
-
     {ok, _TS, Schema} = squorum_get(BrickList, ?BKEY_SCHEMA_DEFINITION),
     {BrickList, Schema}.
 
@@ -1085,6 +1084,8 @@ do_create_new_schema(InitialBrickList, PropList, File) ->
     Res = do_create_new_schema2(InitialBrickList, PropList),
     case separate_good_from_bad(Res) of
         {[], _} = Res2 ->                       % None successful?
+            ?E_CRITICAL("Failed to create new schema. "
+                        "Writing bootstrap key-value failed on all nodes.", []),
             {error, Res2};
         Res2 ->
             ok = write_schema_bootstrap_file(File, InitialBrickList),
@@ -1113,12 +1114,18 @@ write_bootstrap_kv(BrickList, Key0, Val0, add) ->
             fun({Brick, Node} = B) ->
                     catch start_standalone_brick(B),
                     case catch brick_server:do(Brick, Node, [Op]) of
-                        {'EXIT', {Reason, _}} ->
-                            {B, Reason};
                         [{ok, _}] ->
                             {B, ok};
-                        [Res] ->
-                            {B, Res}
+                        {'EXIT', {Reason, _}} ->
+                            ?E_WARNING("Failed to write bootstrap key-value. "
+                                       "node: ~w, brick: ~w, key: ~p, reason: ~p",
+                                       [Node, Brick, Key, Reason]),
+                            {B, Reason};
+                        [Res1] ->
+                            ?E_WARNING("Failed to write bootstrap key-value. "
+                                       "node: ~w, brick: ~w, key: ~p, reason: ~p",
+                                       [Node, Brick, Key, Res1]),
+                            {B, Res1}
                     end
             end, BrickList),
     {TS, Res}.
