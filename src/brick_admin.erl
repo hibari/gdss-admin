@@ -2165,7 +2165,7 @@ run_client_monitor_procs() ->
     FunDn = fun(Node, App) -> ?ELOG_ERROR("Node ~p application ~p is stopped",
                                           [Node, App]),
                               gmt_util:set_alarm({client_node_down, Node},
-                                                 "GDSS application is not "
+                                                 "Hibari client application is not "
                                                  "running on this node.", NoOp)
             end,
     lists:foreach(

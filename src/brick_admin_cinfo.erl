@@ -35,12 +35,12 @@ cluster_info_init() ->
 
 cluster_info_generator_funs() ->
     [
-     {"GDSS: Admin Server status", fun admin_server_status/1},
-     {"GDSS: Bootstrap brick config", fun bootstrap_config/1},
-     {"GDSS: Admin Server schema", fun admin_server_schema/1},
-     {"GDSS: Admin Status top", fun admin_status_top/1},
-     {"GDSS: Admin Status client monitors", fun admin_status_client_mons/1},
-     {"GDSS: History dump", fun history_dump/1}
+     {"Hibari: Admin Server status", fun admin_server_status/1},
+     {"Hibari: Bootstrap brick config", fun bootstrap_config/1},
+     {"Hibari: Admin Server schema", fun admin_server_schema/1},
+     {"Hibari: Admin Status top", fun admin_status_top/1},
+     {"Hibari: Admin Status client monitors", fun admin_status_client_mons/1},
+     {"Hibari: History dump", fun history_dump/1}
     ].
 
 admin_server_schema(C) ->

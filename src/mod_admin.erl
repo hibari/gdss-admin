@@ -496,7 +496,7 @@ make_root_tables(TableList) ->
                    Pid       -> io_lib:format("~p", [node(Pid)])
                end,
     AdminServer = [ <<"<h2>Admin Server</h2>\n">>,
-                    <<"<p> The GDSS Admin Server is running on node: ">>,
+                    <<"<p> The Hibari Admin Server is running on node: ">>,
                     AdminStr,
                     <<"\n\n">>,
                     "<p> The current date and time is: ",
@@ -648,14 +648,14 @@ make_bootstrap_tables() ->
                  ["<h2>WARNING: Bad config value for 'kernel/distrib/gdss_admin'</h2>\n",
                   "<p> The current value is invalid: "
                   "<b>", AdminStr, "</b>.\n"
-                  "<p> If this GDSS cluster will remain a single node "
+                  "<p> If this Hibari cluster will remain a single node "
                   "(i.e. for testing or development work), then you may "
                   "continue with the form below.  CAUTION: The value of "
                   "the 'Local' attribute should be 'true'!\n",
-                  "<p> If this GDSS cluster will be larger than a single "
+                  "<p> If this Hibari cluster will be larger than a single "
                   "node, then <b>this config option must be corrected before ",
                   "continuing any further</b>.  The exact same string must ",
-                  "be used in the central.conf file for each of the GDSS "
+                  "be used in the central.conf file for each of the Hibari "
                   "nodes in the cluster.\n",
                   "<hr><hr><hr>\n"
                  ];
@@ -699,7 +699,7 @@ make_bootstrap_tables() ->
                                       ""
                               end ++
                               ["<p> If it is your intent to have a single-node "
-                               "GDSS cluster, please set "
+                               "Hibari cluster, please set "
                                "the value of 'kernel/distrib/gdss_admin' to ",
                                "be the node name of the single node.\n",
                                lists:duplicate(64, "<hr>")]
