@@ -118,24 +118,24 @@ do2(ModData) ->
 %%                     {error, term()}
 %% @doc EWSAPI config callback.
 load("AdminOptFoo " ++ AuthArg, [])->
-    case catch list_to_atom(httpd_conf:clean(AuthArg)) of
+    case catch list_to_atom(string:strip(AuthArg)) of
         true ->
             {ok, [], {admin_opt_foo, true}};
         false ->
             {ok, [], {admin_opt_foo, false}};
         _ ->
-            {error, ?NICE(httpd_conf:clean(AuthArg) ++ " is an invalid AdminOptFoo directive")}
+            {error, ?NICE(string:strip(AuthArg) ++ " is an invalid AdminOptFoo directive")}
 
     end;
 
 load("AdminOptBar " ++ AuthArg, [])->
-    case catch list_to_atom(httpd_conf:clean(AuthArg)) of
+    case catch list_to_atom(string:strip(AuthArg)) of
         true ->
             {ok, [], {admin_opt_bar, true}};
         false ->
             {ok, [], {admin_opt_bar, false}};
         _ ->
-            {error, ?NICE(httpd_conf:clean(AuthArg) ++ " is an invalid AdminOptBar directive")}
+            {error, ?NICE(string:strip(AuthArg) ++ " is an invalid AdminOptBar directive")}
 
     end.
 

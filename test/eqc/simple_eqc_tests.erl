@@ -169,7 +169,7 @@ initial_state() ->
 
 -spec initial_state(proplist()) -> #state{}.
 initial_state(_Options) ->
-    QQQ = now(),
+    QQQ = gmt_time_otp18:timestamp(),
     gmt_loop:do_while(
       fun(_Acc) ->
               try
@@ -632,8 +632,10 @@ key_prefix() ->
 
 -spec make_exp(state()) -> exp_time().
 make_exp(S) ->
-    {MSec, Sec, USec} = now(),
-    NowX = (MSec * 1000000 * 1000000) + (Sec * 1000000) + USec,
+    NowX = gmt_time_otp18:erlang_system_time(micro_seconds),
+    %% TODO: FIXME: This should read (NowX div 1000) or
+    %% just NowX with erlang_system_time(milli_seconds).
+    %% https://github.com/hibari/gdss-admin/issues/11
     (NowX * 1000) + S#state.step.
 
 -spec apply_exp_time_directive([op_flag()],

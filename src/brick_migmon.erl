@@ -43,6 +43,8 @@
           options = []
          }).
 
+-define(TIME, gmt_time_otp18).
+
 %%%----------------------------------------------------------------------
 %%% API
 %%%----------------------------------------------------------------------
@@ -75,7 +77,7 @@ init([T, Options]) ->
 chains_starting(trigger, S) when is_record(S, state) ->
     ?ELOG_INFO("Migration monitor: ~w: chains starting",
                [(S#state.tab)#table_r.name]),
-    Start = now(),
+    Start = ?TIME:monotonic_time(),
     T = S#state.tab,
     GH = T#table_r.ghash,
 
@@ -97,8 +99,9 @@ chains_starting(trigger, S) when is_record(S, state) ->
                 end, x)
       end, AllChains),
     gen_fsm:send_event(self(), trigger),
-    case timer:now_diff(now(), Start) of
-        N when N < 1*1000*1000 ->
+    End = ?TIME:monotonic_time(),
+    case ?TIME:convert_time_unit(End - Start, native, milli_seconds) of
+        N when N < 1 * 1000 ->
             ?ELOG_INFO("Migration monitor: ~w: sweeps starting",
                        [(S#state.tab)#table_r.name]),
             {next_state, migrating, S};

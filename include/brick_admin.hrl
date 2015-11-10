@@ -31,7 +31,7 @@
 -define(BKEY_MIGRATION_STATE,   migration_state).
 
 -record(hevent, {
-          time                 :: brick_bp:nowtime(),       % now()
+          time                 :: brick_bp:nowtime(),       % erlang:timestamp()
           what                 :: atom(),                   % term()
           detail               :: atom(),                   % term()
           props = []           :: brick_bp:proplist()       % proplist()

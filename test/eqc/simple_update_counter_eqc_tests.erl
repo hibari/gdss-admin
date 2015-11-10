@@ -62,7 +62,7 @@
 %%   Timeout.
 
 update_counter(Tab, Key, Incr, Timeout) when is_integer(Incr) ->
-    update_counter2(Tab, Key, Incr, Timeout, erlang:now());
+    update_counter2(Tab, Key, Incr, Timeout, gmt_time_otp18:monotonic_time());
 update_counter(_Tab, _Key, _Incr, _Timeout) ->
     invalid_arg_present.
 
@@ -72,8 +72,9 @@ update_counter(_Tab, _Key, _Incr, _Timeout) ->
 %%====================================================================
 
 update_counter1(Tab, Key, Incr, Timeout, Expires) ->
-    case timer:now_diff(erlang:now(), Expires) of
-        TDiff when TDiff > Timeout*1000 ->
+    Now = gmt_time_otp18:monotonic_time(),
+    case gmt_time_otp18:convert_time_unit(Now - Expires, native, milli_seconds) of
+        TDiff when TDiff > Timeout ->
             exit(timeout);
         _ ->
             update_counter2(Tab, Key, Incr, Timeout, Expires)

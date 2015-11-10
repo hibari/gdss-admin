@@ -21,6 +21,8 @@
 
 -define(MYNODE, 'gdss_eunit@localhost').
 
+-define(TIME, gmt_time_otp18).
+
 
 %%%----------------------------------------------------------------------
 %%% TEST UTILS
@@ -54,7 +56,7 @@ setup(Verbose) ->
        true ->
             error_logger:delete_report_handler(error_logger_tty_h)
     end,
-    random:seed(erlang:now()),
+    random:seed(?TIME:monotonic_time(), ?TIME:unique_integer(), ?TIME:time_offset()),
     ok.
 
 setup_and_bootstrap() ->
