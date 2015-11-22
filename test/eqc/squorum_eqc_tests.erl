@@ -114,7 +114,7 @@ common1_prop(F_check, Env) ->
 %% Called in symbolic context.
 
 initial_state() ->
-    QQQ = now(),
+    QQQ = gmt_time_otp18:timestamp(),
     gmt_loop:do_while(
       fun(_Acc) ->
               try
@@ -372,8 +372,10 @@ key_prefix() ->
     "/foo/bar/".
 
 make_exp(S) ->
-    {MSec, Sec, USec} = now(),
-    NowX = (MSec * 1000000 * 1000000) + (Sec * 1000000) + USec,
+    NowX = gmt_time_otp18:erlang_system_time(micro_seconds),
+    %% TODO: FIXME: This should read (NowX div 1000) or
+    %% just NowX with erlang_system_time(milli_seconds).
+    %% https://github.com/hibari/gdss-admin/issues/11
     (NowX * 1000) + S#state.step.
 
 random_val() ->

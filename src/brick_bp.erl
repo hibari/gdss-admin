@@ -72,6 +72,8 @@
               , sleep_random     :: integer() % sleep random for check_status
               }).
 
+-define(TIME, gmt_time_otp18).
+
 %%====================================================================
 %% API
 %%====================================================================
@@ -144,7 +146,7 @@ state(Pid) ->
 %% initialize.
 %%--------------------------------------------------------------------
 init([_Name, Brick, Node, BrickOptions] = _Arg) ->
-    _ = random:seed(os:timestamp()),
+    _ = random:seed(?TIME:monotonic_time(), ?TIME:unique_integer(), ?TIME:time_offset()),
     {ok, Time} = application:get_env(gdss_admin, admin_server_brick_poll),
     {ok, TRef} = brick_itimer:send_interval(Time, check_status),
     {ok, SleepRnd} = application:get_env(gdss_admin, admin_server_brick_pinger_sleep_random),
@@ -264,7 +266,7 @@ handle_event(check_status, StateName, State) ->
                                 ?E_ERROR(
                                   "Brick {~w,~w}: killed asynchronously from StateName ~p",
                                   [State#state.brick, State#state.node, StateName]),
-                                Report = [{killed, os:timestamp()},
+                                Report = [{killed, ?TIME:timestamp()},
                                           {old_state, StateName},
                                           {info, "Attempted transition back "
                                            "to 'ok' but brick has not been "

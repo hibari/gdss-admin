@@ -127,6 +127,8 @@ test_simple_rename1() ->
 
 -spec make_exp(non_neg_integer()) -> exp_time().
 make_exp(StepMillis) ->
-    {MSec, Sec, USec} = now(),
-    NowX = (MSec * 1000000 * 1000000) + (Sec * 1000000) + USec,
+    NowX = gmt_time_otp18:erlang_system_time(micro_seconds),
+    %% TODO: FIXME: This should read (NowX div 1000) or
+    %% just NowX with erlang_system_time(milli_seconds).
+    %% https://github.com/hibari/gdss-admin/issues/11
     (NowX * 1000) + StepMillis.

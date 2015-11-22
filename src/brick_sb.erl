@@ -67,6 +67,8 @@
 
 %% History event record, 'hevent', moved to brick_admin.hrl
 
+-define(TIME, gmt_time_otp18).
+
 %%====================================================================
 %% API
 %%====================================================================
@@ -365,13 +367,13 @@ squorum_multiset(Bricks, KVs) ->
     Ops = [brick_server:make_set(term_to_binary(K),
                                  term_to_binary(V, [{compressed,1}])) ||
               {K, V} <- KVs],
-    Start = os:timestamp(),
+    Start = ?TIME:monotonic_time(),
     Res = brick_squorum:multiset(Bricks, Ops),
-    End = os:timestamp(),
-    case timer:now_diff(End, Start) of
-        N when N > 100*1000 ->
+    End = ?TIME:monotonic_time(),
+    case ?TIME:convert_time_unit(End - Start, native, milli_seconds) of
+        N when N > 100 ->
             ?E_INFO("~s:squorum_set(ops len ~p) was ~p msec\n",
-                     [?MODULE, length(KVs), N div 1000]);
+                    [?MODULE, length(KVs), N]);
         _ ->
             ok
     end,
@@ -414,7 +416,9 @@ make_status_report_op({report_status, {Type, Name} = Key,
                            true ->
                                 State#state.status
                         end,
-            HEvent = #hevent{time = now(), what = What, detail = Status,
+            HEvent = #hevent{time = ?TIME:timestamp(),
+                             what = What,
+                             detail = Status,
                              props = PropList},
             NewHList = [HEvent|OldHList],
             NewHistory = dict:store(Key, NewHList, State#state.history),

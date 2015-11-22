@@ -24,6 +24,8 @@
 
 -record(hunk_summ, {seq,off,type,len,first_off,c_len,u_len,md5s,c_blobs,u_blobs}).
 
+-define(TIME, gmt_time_otp18).
+
 -define(BRICK__GET_MANY_FIRST, '$start_of_table').
 -define(BIGKEY, <<"big one">>).
 -define(BIGSIZE, (1000*1000)).
@@ -60,7 +62,7 @@ get_busy() ->
 get_busy0(Br) ->
     Key = ?BIGKEY,
     Flags = [],
-    Message = {do, now(), [brick_server:make_get(Key, Flags)], []},
+    Message = {do, ?TIME:timestamp(), [brick_server:make_get(Key, Flags)], []},
 %%    Message = {status},
     io:format(":::message=~p:::~n",[Message]),
     lists:foreach(fun(_) ->
@@ -124,13 +126,13 @@ test_get_many(Tab) ->
         %% gmt_util:dbgadd(brick_server, handle_call_do_prescreen2),
         %% gmt_util:dbgadd(gen_server, call),
 
-        StartT = erlang:now(),
+        StartT = ?TIME:monotonic_time(),
         io:format("::: get_many starting:::~n"),
         lists:takewhile(TestFun0, lists:seq(1,1000)),
-        EndT = erlang:now(),
-        Diff = timer:now_diff(EndT,StartT),
+        EndT = ?TIME:monotonic_time(),
+        Diff = ?TIME:convert_time_unit(EndT - StartT, native, milli_seconds),
         io:format("::: get_many finished in ~B.~3..0B seconds-------~n",
-              [Diff div (1000*1000), (Diff div 1000) rem 1000])
+              [Diff div 1000, Diff rem 1000])
     end,
     ThreadsList = [0,0,0,0,0],
     StartKeysList = [0],
@@ -262,7 +264,7 @@ get_keys0(Tab,StartCheckpoint) ->
     end,
 
     io:format("::: starting get_keys ------------~n"),
-    StartT = erlang:now(),
+    StartT = ?TIME:monotonic_time(),
     case catch brick_ets:scavenger_get_keys(Br, Fs, First, F_k2d, F_lump) of
     ok ->
         noop;
@@ -271,10 +273,10 @@ get_keys0(Tab,StartCheckpoint) ->
     _E ->
         io:format(":::get_keys0: error(~p):::~n", [_E])
     end,
-    EndT = erlang:now(),
-    Diff = timer:now_diff(EndT,StartT),
+    EndT = ?TIME:monotonic_time(),
+    Diff = ?TIME:convert_time_unit(EndT - StartT, native, milli_seconds),
     io:format("::: get_keys finished in ~B.~3..0B seconds-------~n",
-         [Diff div (1000*1000), (Diff div 1000) rem 1000]),
+         [Diff div 1000, Diff rem 1000]),
     ok.
 
 init0() ->

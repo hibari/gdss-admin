@@ -141,6 +141,8 @@
 
 %% For opconf_r record, see brick_admin.hrl
 
+-define(TIME, gmt_time_otp18).
+
 %%====================================================================
 %% API
 %%====================================================================
@@ -214,7 +216,7 @@ state(ServerRef) ->
 %%--------------------------------------------------------------------
 init([Chain, Bricks]) ->
     self() ! finish_init_tasks,
-    _ = random:seed(os:timestamp()),
+    _ = random:seed(?TIME:monotonic_time(), ?TIME:unique_integer(), ?TIME:time_offset()),
     {ok, Time} = application:get_env(gdss_admin, admin_server_chain_poll),
     {ok, TRef} = brick_itimer:send_interval(Time, check_status),
     SBPid = brick_sb:sb_pid(),
@@ -487,12 +489,12 @@ calculate_best_first_brick(S) ->
 %% <ul>
 %% <li> Brick has never been in 'ok' state.  We assign the atom
 %%      never_been_up as the last up "time" for this brick.  Any
-%%      atom will sort before any tuple (i.e. a legit erlang:now() 3-tuple)
+%%      atom will sort before any tuple (i.e. a legit erlang:timestamp() 3-tuple)
 %%      or a binary.</li>
 %% <li> A brick has been in an 'ok' state, but then it changed to a non-ok
 %%      state, e.g. 'unknown'.  After the last 'ok' event, it's the
 %%      first state transition <b>after that</b> that tells us when the
-%%      last time the brick had up-to-date data.  So we use the erlang:now()
+%%      last time the brick had up-to-date data.  So we use the erlang:timestamp()
 %%      3-tuple for our sorting. </li>
 %% <li> A brick has been in an 'ok' state, but the history does not include
 %%      any non-ok state afterward.  So, as far as we know, that brick has
@@ -1542,7 +1544,7 @@ add_repair_brick_to_end({NewTail, NewTailNode} = _NewTailBrick, S) ->
 -spec poll_for_full_sync(brick_name(), node(), integer()) -> ok | {poll_for_full_sync, timeout, integer(), integer()}.
 poll_for_full_sync(Brick, Node, TimeLimit_0) ->
     TimeLimit = TimeLimit_0 * 1000,             % Convert to usec.
-    Start = os:timestamp(),
+    Start = ?TIME:monotonic_time(),
     SyncPoll =
         fun(Acc) ->
                 case brick_server:chain_get_downstream_serials(Brick, Node) of
@@ -1550,7 +1552,8 @@ poll_for_full_sync(Brick, Node, TimeLimit_0) ->
                         %%io:format("p11 ~p ~p\n", [X, X]),
                         {false, Acc};
                     {X, Y} when is_integer(X), is_integer(Y) ->
-                        case timer:now_diff(os:timestamp(), Start) of
+                        End = ?TIME:monotonic_time(),
+                        case ?TIME:convert_time_unit(End - Start, native, micro_seconds) of
                             D when D > TimeLimit ->
                                 {false, {poll_for_full_sync, timeout, X, Y}};
                             _   ->

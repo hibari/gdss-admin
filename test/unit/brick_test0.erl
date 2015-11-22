@@ -33,6 +33,7 @@
 
 -define(M, brick_server).
 -define(SQ, brick_squorum).
+-define(TIME, gmt_time_otp18).
 -define(TEST_NAME,      regression_test0).
 -define(TEST_NAME_STR, "regression_test0").
 -define(BIGDATA_DIR,   "./regression-bigdata-dir").
@@ -746,7 +747,7 @@ t51(BrickName, Node, NumProcs, PhaseTime, DoSet) ->
     {ok, _} = ?M:replace(BrickName, Node, "t50-s1", "t50-s1-val2"),
 
     Val2K = list_to_binary(lists:duplicate(2*1024, $x)),
-    _Val2K_y = list_to_binary(lists:duplicate(2*1024, $y)),
+    %% _Val2K_y = list_to_binary(lists:duplicate(2*1024, $y)),
 
     if DoSet == true ->
             io:format("\n"),
@@ -828,11 +829,11 @@ t51(BrickName, Node, NumProcs, PhaseTime, DoSet) ->
     %%               [[{ok, _, Val2K_y}] = ?M:multi_get(BrickName, Node, K, []) || K <- Keys],
     %%               Parent ! {done, self()}
     %%       end,
-    %%     Start1b = now(),
+    %%     Start1b = ?TIME:monotonic_time(),
     %%     Pids1b = [spawn(fun() -> Fmulti_get_repair(Keys) end) || Keys <- ChoppedKeys1],
     %%     lists:foreach(fun(Pid) -> receive {done, Pid} -> ok end end, Pids1b),
-    %%     Stop1b = now(),
-    %%     DiffSec = timer:now_diff(Stop1b, Start1b) / (1000*1000),
+    %%     Stop1b = ?TIME:monotonic_time(),
+    %%     DiffSec = ?TIME:convert_time_unit(Stop1b - Start1b, native, seconds),
     %%     io:format("done in ~w sec, ~w ops/sec\n", [DiffSec, length(Keys0) / DiffSec]),
 
     %%     Fun1 = fun(Node) ->
@@ -1020,8 +1021,9 @@ t60_get_longer(Nodes, BrickName, RS = _Summary) ->
     Meddler1Pid = spawn_link(Fmeddling_deleter1),
     Fget_loop1 =
         fun({StartTime, Meddler, Count}) ->
-                case timer:now_diff(now(), StartTime) of
-                    N when N > LoopSeconds*1000*1000 ->
+                Now = ?TIME:monotonic_time(),
+                case ?TIME:convert_time_unit(Now - StartTime, native, seconds) of
+                    N when N > LoopSeconds ->
                         Meddler ! {stop, self()},
                         DelCount = receive {ok, Meddler, Dels} -> Dels end,
                         %% One last get to repair Key1, if necessary.
@@ -1035,7 +1037,7 @@ t60_get_longer(Nodes, BrickName, RS = _Summary) ->
                 end
         end,
     {DelCount1, ReadCount1} =
-        gmt_loop:do_while(Fget_loop1, {now(), Meddler1Pid, 0}),
+        gmt_loop:do_while(Fget_loop1, {?TIME:monotonic_time(), Meddler1Pid, 0}),
     io:format("t60_get_longer: 1: delete count = ~w\n", [DelCount1]),
     io:format("t60_get_longer: 1: read count   = ~w\n", [ReadCount1]),
     timer:sleep(1000),
@@ -1067,7 +1069,7 @@ t60_get_longer(Nodes, BrickName, RS = _Summary) ->
         end,
     Meddler2Pid = spawn_link(Fmeddling_deleter2),
     {DelCount2, ReadCount2} =
-        gmt_loop:do_while(Fget_loop1, {now(), Meddler2Pid, 0}),
+        gmt_loop:do_while(Fget_loop1, {?TIME:monotonic_time(), Meddler2Pid, 0}),
     io:format("t60_get_longer: 2: delete count = ~w\n", [DelCount2]),
     io:format("t60_get_longer: 2: read count   = ~w\n", [ReadCount2]),
     timer:sleep(1000),
@@ -1808,7 +1810,7 @@ chain_t30(OptionList) ->
     LH1 = brick_hash:naive_init(ChainGrp1),
     LH2 = brick_hash:naive_init(ChainGrp2),
     LH3 = brick_hash:naive_init(ChainGrp3),
-    _LHs = [LH1, LH2, LH3],
+    %% _LHs = [LH1, LH2, LH3],
     GH1 = brick_hash:init_global_hash_state(false, unused, 1,
                                             LH1, ChainGrp1,
                                             LH1, ChainGrp1),
@@ -2179,7 +2181,7 @@ chain_t40(OptionList) ->
     {'EXIT', {timeout, _}} =
         (catch ?M:set(BrickName, Node, Key1, Val2, 500)),
     ?DBG_GENx({?MODULE,?LINE}),
-    StartTime1 = now(),
+    StartTime1 = ?TIME:monotonic_time(),
     Parent = self(),
     MinTime = TimeOut * 1,
     MaxTime = TimeOut * 15,
@@ -2187,7 +2189,8 @@ chain_t40(OptionList) ->
                           ?DBG_GENx({?MODULE,?LINE}),
                           Res = (catch ?M:set(BrickName, Node, Key1, Val3,
                                               MaxTime)),
-                          DiffMS = timer:now_diff(now(), StartTime1) / 1000,
+                          Now = ?TIME:monotonic_time(),
+                          DiffMS = ?TIME:convert_time_unit(Now - StartTime1, native, milli_seconds),
                           Parent ! {self(), Res, DiffMS}
                   end),
     %% If we sleep for MinTime, then turn of read-only mode, our child
@@ -3873,8 +3876,7 @@ put_rand_keys_via_simple(Tab, MaxKey, Num, KeyPrefix, KeySuffix, ValLen,
     [begin
          Parent = self(),
          F = fun() ->
-                     {A, B, C} = now(),
-                     _ = random:seed(A, B, C),
+                     _ = random:seed(?TIME:monotonic_time(), ?TIME:unique_integer(), ?TIME:time_offset()),
                      RandL = integer_to_list(random:uniform(MaxKey)),
                      Key = gmt_util:bin_ify(KeyPrefix ++ RandL ++ KeySuffix),
                      case brick_simple:set(Tab, Key, Val, 60*1000) of

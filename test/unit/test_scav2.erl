@@ -26,6 +26,8 @@
 
 -record(hunk_summ, {seq,off,type,len,first_off,c_len,u_len,md5s,c_blobs,u_blobs}).
 
+-define(TIME, gmt_time_otp18).
+
 -define(BRICK__GET_MANY_FIRST, '$start_of_table').
 -define(BIGKEY, <<"big one">>).
 -define(BIGSIZE, (1000*1000)).
@@ -195,14 +197,14 @@ get_keys00ctab(Tab,StartCheckpoint) ->
 
     io:format("::: starting get_keys/ctab(checkpoint=~p) ------------~n",
               [StartCheckpoint]),
-    StartT = erlang:now(),
+    StartT = ?TIME:monotonic_time(),
 
     Keys = get_many_all(Tab),
 
-    EndT = erlang:now(),
-    Diff = timer:now_diff(EndT,StartT),
+    EndT = ?TIME:monotonic_time(),
+    Diff = ?TIME:convert_time_unit(EndT - StartT, native, milli_seconds),
     io:format("::: get_keys/ctab finished in ~B.~3..0B seconds-------~n",
-              [Diff div (1000*1000), (Diff div 1000) rem 1000]),
+              [Diff div 1000, Diff rem 1000]),
     io:format("::: get_keys/ctab returned ~p keys~n",
               [length(Keys)]),
     ok.
@@ -245,7 +247,7 @@ get_keys00(Tab,StartCheckpoint) ->
 
     io:format("::: starting get_keys(checkpoint=~p) ------------~n",
               [StartCheckpoint]),
-    StartT = erlang:now(),
+    StartT = ?TIME:monotonic_time(),
     case catch brick_ets:scavenger_get_keys(Br, Fs, First,
                                             F_k2d, F_lump) of
         ok ->
@@ -255,10 +257,10 @@ get_keys00(Tab,StartCheckpoint) ->
         _E ->
             io:format(":::get_keys0: error(~p):::~n", [_E])
     end,
-    EndT = erlang:now(),
-    Diff = timer:now_diff(EndT,StartT),
+    EndT = ?TIME:monotonic_time(),
+    Diff = ?TIME:convert_time_unit(EndT - StartT, native, milli_seconds),
     io:format("::: get_keys finished in ~B.~3..0B seconds-------~n",
-              [Diff div (1000*1000), (Diff div 1000) rem 1000]),
+              [Diff div 1000, Diff rem 1000]),
     io:format("::: get_keys returned ~p keys~n",
               [get(KeysD)]),
 
@@ -395,7 +397,7 @@ get(Tab,KeysSplit,PParent) ->
     do(Tab,KeysSplit,PParent,Fun0,get).
 
 do(_Tab,KeysSplit,PParent,Fun0,Name) ->
-    _Parent = self(),
+    %% _Parent = self(),
     SetFun =
         fun(Keys) ->
                 fun() ->
@@ -407,8 +409,7 @@ do(_Tab,KeysSplit,PParent,Fun0,Name) ->
                                           PParent ! client_done,
                                           exit(normal)
                                   after 0 ->
-                                          _B=list_to_binary(
-                                               integer_to_list(N)),
+                                          %% _B = list_to_binary(integer_to_list(N)),
                                           case catch Fun0(N) of
                                               ok ->
                                                   noop; %% for set

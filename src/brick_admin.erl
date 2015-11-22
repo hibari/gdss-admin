@@ -81,6 +81,8 @@
 
 -include("brick_specs.hrl").
 
+-define(TIME, gmt_time_otp18).
+
 -define(S3_TABLE, 'tab1').
 
 %% API
@@ -149,7 +151,7 @@
 -record(state, {
           schema = undefined,                               % dict:new()
           mig_mons = undefined,                             % migration monitor 2-tuples
-          start_time = undefined,                           % now()
+          start_time = undefined,                           % erlang:timestamp()
           extra_term = undefined,                           % term()
           mbox_highwater = undefined
          }).
@@ -808,7 +810,7 @@ handle_info({finish_init_tasks, BootstrapFile}, State) ->
     {ok, MboxHigh} = application:get_env(gdss_admin, brick_admin_mbox_high_water),
     %% Cross-app dependency: we need the partition_detector app running.
     %% If not, complain loudly.
-    StartTime = now(),
+    StartTime = ?TIME:timestamp(),
     ExtraStarting = {brick_admin, {starting, StartTime, node(), self()}},
     ExtraRunning = {brick_admin, {running, StartTime, node(), self()}},
     case (catch partition_detector_server:is_active()) of
@@ -1688,7 +1690,7 @@ do_start_migration(TableName, NewLH, Options, S) ->
             NewGH_0 = brick_hash:init_global_hash_state(
                         true, pre, OldGH#g_hash_r.current_rev,
                         CurLH, CurChainList, NewLH, NewChainList, false),
-            Cookie = now(),
+            Cookie = ?TIME:timestamp(),
             NewGH_1 = NewGH_0#g_hash_r{cookie = Cookie,
                                        minor_rev = OldGH#g_hash_r.minor_rev+1},
             NewGH_2 = lists:foldl(
@@ -1973,7 +1975,7 @@ check_for_other_admin_server_beacons(Intervals, MyStartTime, FailUSecs) ->
 running_admin_beacons_p(USecs, MyStartTime) ->
     Bs0 = partition_detector_server:get_last_beacons(),
     %% io:format("Bs0 ~p\n", [Bs0]),
-    Now = now(),
+    Now = ?TIME:timestamp(),
     Bs = lists:filter(fun(B) ->
                               %% io:format("Diff ~p ~p\n", [timer:now_diff(Now, B#beacon.time), B]),
                               timer:now_diff(Now, B#beacon.time) < USecs
@@ -2379,10 +2381,10 @@ start_throttle_server_maybe(Node, Opts) ->
 %% @doc Start throttle server under the brick_admin_sup supervisor.
 
 start_throttle_server(Node, Opts) ->
-    BwThrottle = proplists:get_value(throttle_bytes, Opts, 999*1000*1000),
-    Hour = 1*60*60*1000,
-    Spec = {now(), {brick_ticket, start_link,
-                    [undefined, BwThrottle, 1000, Hour]},
+    BwThrottle = proplists:get_value(throttle_bytes, Opts, 999 * 1000 * 1000),
+    Hour = 1 * 60 * 60 * 1000,
+    Spec = {?TIME:timestamp(), {brick_ticket, start_link,
+                                [undefined, BwThrottle, 1000, Hour]},
             temporary, 2000, worker, [brick_ticket]},
     {ok, ThrottlePid} =
         supervisor:start_child({brick_admin_sup, Node}, Spec),

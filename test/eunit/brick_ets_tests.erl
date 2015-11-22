@@ -17,6 +17,8 @@
 -compile(export_all).
 -include_lib("eunit/include/eunit.hrl").
 
+-define(TIME, gmt_time_otp18).
+
 -define(MAXKEYS,5000).
 
 -define(KILLTIME,30000).
@@ -55,7 +57,7 @@ test_teardown(X) ->
     ok.
 
 test_data_integrity() ->
-    random:seed(erlang:now()),
+    random:seed(?TIME:monotonic_time(), ?TIME:unique_integer(), ?TIME:time_offset()),
     [ ok = test_data_integrity(T,10) || {T,[],true} <- all_tables()].
 
 test_data_integrity(_T,0) ->

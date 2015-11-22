@@ -78,7 +78,8 @@ bootstrap_config(C) ->
     cluster_info:send(C, Bin).
 
 history_dump(C) ->
-    Tmp = lists:flatten(io_lib:format("/tmp/history.~p", [os:timestamp()])),
+    Tmp = lists:flatten(io_lib:format("/tmp/history.~p",
+                                      [gmt_time_otp18:system_time(micro_seconds)])),
     Res = try
               ok = mod_admin:dump_history(Tmp),
               {ok, Out} = file:read_file(Tmp),
