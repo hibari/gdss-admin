@@ -212,13 +212,13 @@ primitive_do(Bricks, OpList, Timeout, StripP) ->
       fun({Pid, Brick}, {ResList, ResBad}) ->
               receive
                   {Pid, {'EXIT', _X}} ->
-                      %%?DBG({Pid, _X}),
+                      %%?ELOG_DEBUG("~p", [{Pid, {'EXIT', _X}}]),
                       {ResList, [Brick|ResBad]};
                   {Pid, X0} ->
                       X = if StripP -> hd(X0);
                              true   -> X0
                           end,
-                      %%?DBG({Pid, X}),
+                      %%?ELOG_DEBUG("~p", [{Pid, {'EXIT', _X}}]),
                       {[{Brick, X}|ResList], ResBad}
               end
       end, {[], []}, PidsBricksUp).
@@ -255,15 +255,17 @@ strict_quorum_answer_set(MultiCallRes, Servers, _Op) ->
             if length(NonConformingBricks) == length(Servers) ->
                     failed;
                true ->
-                    ?ELOG_INFO("quorum_error: Op = ~P\nNonConformingBricks = ~p\nServers = ~p",
-                               [_Op, 20, NonConformingBricks, Servers]),
+                    ?ELOG_WARNING("quorum_error: Op = ~P\n"
+                                  "    NonConformingBricks = ~p\n"
+                                  "    Servers = ~p",
+                                  [_Op, 20, NonConformingBricks, Servers]),
                     quorum_error
             end;
        Count >= MinQuorum ->
             Answer;
        true ->
-            ?ELOG_INFO("quorum_error: Op = ~P\n"
-                       "true/default clause A: ~p ~p ~p ~p",
+            ?ELOG_WARNING("quorum_error: Op = ~P\n"
+                          "     true/default clause A: ~p ~p ~p ~p",
                        [_Op, 20, Count, MinQuorum, Rs, BadNodes]),
             quorum_error
     end.

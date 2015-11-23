@@ -851,8 +851,11 @@ handle_info({finish_init_tasks, BootstrapFile}, State) ->
     %% Use bootstrap hint file to find our schema.  Read/write is not yet ok.
     {DiskBrickList2, Schema} = bootstrap_existing_schema(BootstrapFile),
 
+    TableNames = [ TableName || {TableName, _} <- dict:to_list(Schema#schema_r.tabdefs) ],
+    ?ELOG_INFO("Loaded schema. tables: ~p", [TableNames]),
+
     %% Update on-disk schema location hints, if needed.
-    if DiskBrickList2 /= Schema#schema_r.schema_bricklist ->
+    if DiskBrickList2 =/= Schema#schema_r.schema_bricklist ->
             OldFile = BootstrapFile ++ integer_to_list(gmt_time:time_t()),
             ok = file:rename(BootstrapFile, OldFile),
             ok = write_schema_bootstrap_file(BootstrapFile, Schema#schema_r.schema_bricklist),
@@ -991,14 +994,18 @@ async_start_pingers_and_chmons(Schema) ->
 
 bootstrap_existing_schema(File) ->
     BrickList = get_bricklist_from_disk(File),
-    bootstrap_existing_schema2(BrickList).
 
-bootstrap_existing_schema2(BrickList) ->
     %% Get schema-storing nodes running, as many as possible.
     %% We don't care if we encounter most errors.
     _ = [catch start_standalone_brick(Brick) || Brick <- BrickList],
-    {ok, _TS, Schema} = squorum_get(BrickList, ?BKEY_SCHEMA_DEFINITION),
-    {BrickList, Schema}.
+    case squorum_get(BrickList, ?BKEY_SCHEMA_DEFINITION) of
+        {ok, _TS, Schema} ->
+            {BrickList, Schema};
+        Err ->
+            ?ELOG_CRITICAL("Cannot bootstrap existing schema. "
+                           "The schema definition is not available. ~p", [Err]),
+            error({cannot_bootstrap_existing_schema, Err})
+    end.
 
 %% @spec (path()) -> list(brick_t())
 %% @doc Read the list of brick from a file, for bootstrapping purposes.
